@@ -1,0 +1,16 @@
+const express = require('express');
+const router = express.Router();
+const barangController = require('../controllers/barangController');
+
+router.get('/', barangController.getAllBarang);
+router.get('/monitoring', barangController.getMonitoringStok);
+router.get('/preview-expired', barangController.previewExpired);
+router.get('/laporan-kerugian', barangController.getLaporanKerugian);
+router.post('/buang-expired', barangController.buangExpired);
+router.post('/', barangController.createBarang);
+router.put('/:id/harga', barangController.updateHarga);
+router.get('/:barang_id/batches', barangController.getBatches);
+router.post('/:barang_id/batches', barangController.createBatch);
+router.get('/:id/riwayat-harga', barangController.getRiwayatHarga);
+
+module.exports = router;

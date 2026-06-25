@@ -1,0 +1,515 @@
+:root {
+  --bg-color: #f8fafc;
+  --panel-bg: #ffffff;
+  --panel-border: #e2e8f0;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --accent: #1e3a8a;
+  --accent-hover: #1e40af;
+  --danger: #ef4444;
+  --warning: #eab308;
+  --success: #10b981;
+  --glass-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.glass-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: var(--glass-shadow);
+  padding: 24px;
+  min-width: 0;
+}
+
+.btn {
+  background-color: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:hover {
+  background-color: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
+}
+
+.btn-danger {
+  background-color: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+.btn-danger:hover {
+  background-color: var(--danger);
+  color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.btn-success {
+  background-color: var(--success);
+}
+.btn-success:hover {
+  background-color: #059669;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.btn-warning {
+  background-color: var(--warning);
+  color: #fff;
+}
+.btn-warning:hover {
+  background-color: #ca8a04;
+}
+
+input, select {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: #f8fafc;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+  border-color: var(--accent);
+  background: #ffffff;
+}
+
+.layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 280px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--accent);
+  color: white;
+}
+
+.sidebar h2 {
+  color: white;
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar .btn {
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.05);
+  width: 100%;
+}
+.sidebar .btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+.sidebar .btn-success {
+  background: var(--warning);
+  color: var(--text-primary);
+}
+
+.main-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* POS Specific */
+.pos-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  height: 100%;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.product-card {
+  cursor: pointer;
+  padding: 16px;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  background: white;
+}
+
+.product-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  border-color: var(--accent);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-bg {
+  width: 48px;
+  height: 24px;
+  background: var(--panel-border);
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.3s;
+}
+
+.toggle-bg[data-active="true"] {
+  background: var(--warning);
+}
+
+.toggle-knob {
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-bg[data-active="true"] .toggle-knob {
+  transform: translateX(24px);
+}
+
+.text-warning {
+  color: var(--warning) !important;
+}
+.bg-warning {
+  background-color: var(--warning) !important;
+  color: white !important;
+}
+
+/* Receipt Modal Styles */
+.receipt-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.receipt-modal {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  color: black;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-receipt, .printable-receipt * {
+    visibility: visible;
+  }
+  .printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 80mm; /* typical POS thermal printer width */
+    margin: 0;
+    padding: 10px;
+    box-shadow: none;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Table Styles */
+.table-container {
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.data-table thead {
+  position: sticky;
+  top: 0;
+  background-color: #f8fafc;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.data-table th {
+  padding: 16px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  background-color: #f8fafc;
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid var(--panel-border);
+  transition: background-color 0.2s ease;
+}
+
+.data-table tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+.data-table td {
+  padding: 14px 16px;
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.data-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* Grid Utilities */
+.grid-2fr-1fr {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+.grid-1fr-1fr {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.grid-4-cols {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+/* --- RESPONSIVE UTILITIES --- */
+
+/* Mobile Navigation Containers (Hidden on Desktop) */
+.mobile-top-header {
+  display: none;
+}
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Layout */
+  .layout {
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  /* Hide Desktop Sidebar */
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Show Mobile Navigation */
+  .mobile-top-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--accent);
+    color: white;
+    height: 60px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .mobile-top-header h2 {
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: white;
+    height: 65px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    border-top: 1px solid var(--panel-border);
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    padding-bottom: env(safe-area-inset-bottom); /* iOS support */
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 10px;
+    flex: 1;
+    height: 100%;
+    cursor: pointer;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  .bottom-nav-item.active {
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  .bottom-nav-item span {
+    font-size: 20px;
+    margin-bottom: 2px;
+  }
+
+  /* Adjust Main Content Area */
+  .main-content {
+    padding: 16px !important;
+    padding-top: 76px !important; /* 60px header + 16px padding */
+    padding-bottom: 81px !important; /* 65px footer + 16px padding */
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  /* Pos Grid */
+  .pos-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+
+  /* Product Grid */
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+  }
+
+  /* Grids */
+  .grid-2fr-1fr, .grid-1fr-1fr, .grid-4-cols {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Table Container Scrolling */
+  .table-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .data-table {
+    min-width: 0;
+  }
+  .data-table th, .data-table td {
+    padding: 10px 8px !important;
+    font-size: 12px !important;
+  }
+
+  /* POS controls */
+  .pos-controls {
+    flex-direction: column !important;
+  }
+  
+  .pos-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Forms & Buttons */
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Specifically target buttons in table actions to not expand 100% */
+  .data-table .btn {
+    width: auto;
+    display: inline-flex;
+  }
+
+  /* Adjust inputs for mobile to prevent zoom */
+  input, select, button {
+    font-size: 14px !important;
+    min-height: 44px; /* Better touch target */
+  }
+
+  /* Hide print block in mobile view just in case */
+  .receipt-overlay {
+    padding: 16px;
+  }
+
+  /* Prevent icon buttons from expanding full width on mobile */
+  .btn-icon {
+    width: auto !important;
+    flex: 0 0 auto !important;
+    min-width: 44px !important;
+    padding: 0 12px !important;
+  }
+}

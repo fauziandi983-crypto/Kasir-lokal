@@ -1,0 +1,254 @@
+const { getDB } = require('../db');
+
+exports.getAllBarang = async (req, res) => {
+  try {
+    const db = await getDB();
+    const rows = await db.all(`
+      SELECT b.*, COALESCE(SUM(bb.stok_batch), 0) AS total_stok, s.nama_supplier 
+      FROM barang b 
+      LEFT JOIN barang_batch bb ON b.id = bb.barang_id AND bb.stok_batch > 0 AND bb.tgl_expired >= CURRENT_DATE
+      LEFT JOIN supplier s ON b.supplier_id = s.id
+      GROUP BY b.id 
+      ORDER BY b.nama_barang ASC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching barang' });
+  }
+};
+
+exports.previewExpired = async (req, res) => {
+  try {
+    const db = await getDB();
+    const expiredBatches = await db.all(`
+      SELECT bb.id, bb.stok_batch, bb.tgl_expired, b.nama_barang, COALESCE(bb.harga_beli_aktual, b.harga_beli) as harga_modal
+      FROM barang_batch bb
+      JOIN barang b ON bb.barang_id = b.id
+      WHERE bb.tgl_expired < CURRENT_DATE AND bb.stok_batch > 0
+    `);
+    
+    let totalItems = 0;
+    let totalKerugian = 0;
+    
+    expiredBatches.forEach(b => {
+      totalItems += b.stok_batch;
+      totalKerugian += (b.stok_batch * b.harga_modal);
+    });
+    
+    res.json({ totalItems, totalKerugian, batches: expiredBatches });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error memuat preview kerugian' });
+  }
+};
+
+exports.buangExpired = async (req, res) => {
+  try {
+    const db = await getDB();
+    
+    // Get all expired before zeroing
+    const expiredBatches = await db.all(`
+      SELECT bb.id as batch_id, bb.barang_id, bb.stok_batch, COALESCE(bb.harga_beli_aktual, b.harga_beli) as harga_modal, b.nama_barang
+      FROM barang_batch bb
+      JOIN barang b ON bb.barang_id = b.id
+      WHERE bb.tgl_expired < CURRENT_DATE AND bb.stok_batch > 0
+    `);
+    
+    if (expiredBatches.length === 0) {
+      return res.json({ message: 'Tidak ada stok kedaluwarsa yang perlu dibuang.' });
+    }
+
+    await db.run('BEGIN TRANSACTION');
+    
+    let totalTerbuang = 0;
+    
+    for (const batch of expiredBatches) {
+      const kerugian = batch.stok_batch * batch.harga_modal;
+      await db.run(`
+        INSERT INTO log_kerugian (barang_id, batch_id, jumlah_stok_terbuang, nilai_kerugian_rp, keterangan)
+        VALUES (?, ?, ?, ?, ?)
+      `, [batch.barang_id, batch.batch_id, batch.stok_batch, kerugian, `Stok expired: ${batch.nama_barang}`]);
+      
+      totalTerbuang += batch.stok_batch;
+    }
+    
+    await db.run("UPDATE barang_batch SET stok_batch = 0 WHERE tgl_expired < CURRENT_DATE AND stok_batch > 0");
+    await db.run('COMMIT');
+    
+    res.json({ message: `Berhasil mengeluarkan ${totalTerbuang} item barang kedaluwarsa dan mencatat kerugian.` });
+  } catch (error) {
+    console.error(error);
+    const db = await getDB();
+    await db.run('ROLLBACK');
+    res.status(500).json({ message: 'Error membuang stok kedaluwarsa' });
+  }
+};
+
+exports.getLaporanKerugian = async (req, res) => {
+  try {
+    const db = await getDB();
+    const rows = await db.all(`
+      SELECT l.*, b.nama_barang 
+      FROM log_kerugian l
+      LEFT JOIN barang b ON l.barang_id = b.id
+      ORDER BY l.tanggal DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching laporan kerugian' });
+  }
+};
+
+exports.getMonitoringStok = async (req, res) => {
+  try {
+    const db = await getDB();
+    const rows = await db.all(`
+      SELECT 
+        bb.id AS batch_id, bb.no_batch, bb.stok_batch, bb.tgl_expired, bb.tgl_masuk,
+        b.kode_barang, b.nama_barang, b.satuan_pecahan
+      FROM barang_batch bb
+      JOIN barang b ON bb.barang_id = b.id
+      WHERE bb.stok_batch > 0
+      ORDER BY bb.tgl_expired ASC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching monitoring stok' });
+  }
+};
+
+exports.createBarang = async (req, res) => {
+  let db;
+  try {
+    const {
+      kode_barang, nama_barang, kategori, satuan_utama, satuan_pecahan,
+      multiplier_konversi, harga_beli, harga_jual_ecer,
+      harga_jual_grosir, min_beli_grosir, stok_awal_referensi,
+      stok_minimum, nama_supplier
+    } = req.body;
+
+    db = await getDB();
+    await db.run('BEGIN TRANSACTION');
+
+    let supplier_id = null;
+    if (nama_supplier && nama_supplier.trim()) {
+      const existing = await db.get('SELECT id FROM supplier WHERE nama_supplier = ? COLLATE NOCASE', [nama_supplier.trim()]);
+      if (existing) {
+        supplier_id = existing.id;
+      } else {
+        const supResult = await db.run('INSERT INTO supplier (nama_supplier) VALUES (?)', [nama_supplier.trim()]);
+        supplier_id = supResult.lastID;
+      }
+    }
+
+    const query = `
+      INSERT INTO barang (
+        kode_barang, nama_barang, kategori, satuan_utama, satuan_pecahan,
+        multiplier_konversi, harga_beli, harga_jual_ecer,
+        harga_jual_grosir, min_beli_grosir, stok_awal_referensi,
+        stok_minimum, supplier_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const result = await db.run(query, [
+      kode_barang, nama_barang, kategori || 'Umum', satuan_utama, satuan_pecahan,
+      multiplier_konversi, harga_beli, harga_jual_ecer,
+      harga_jual_grosir, min_beli_grosir, stok_awal_referensi,
+      stok_minimum || 0, supplier_id
+    ]);
+
+    await db.run('COMMIT');
+    res.status(201).json({ id: result.lastID, message: 'Barang created' });
+  } catch (error) {
+    if (db) await db.run('ROLLBACK');
+    console.error(error);
+    res.status(500).json({ message: 'Error creating barang' });
+  }
+};
+
+exports.updateHarga = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { harga_beli, harga_jual_ecer, harga_jual_grosir } = req.body;
+
+    const db = await getDB();
+    await db.run(
+      'UPDATE barang SET harga_beli = ?, harga_jual_ecer = ?, harga_jual_grosir = ? WHERE id = ?',
+      [harga_beli, harga_jual_ecer, harga_jual_grosir, id]
+    );
+
+    res.json({ message: 'Harga berhasil diupdate' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error updating harga' });
+  }
+};
+
+exports.getBatches = async (req, res) => {
+  try {
+    const { barang_id } = req.params;
+    const db = await getDB();
+    const rows = await db.all('SELECT * FROM barang_batch WHERE barang_id = ? ORDER BY tgl_expired ASC', [barang_id]);
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching batches' });
+  }
+};
+
+exports.createBatch = async (req, res) => {
+  try {
+    const { barang_id } = req.params;
+    const { barcode_batch, stok_batch, tgl_masuk, tgl_expired, supplier_id, harga_beli_aktual } = req.body;
+
+    const db = await getDB();
+    
+    const barang = await db.get('SELECT kode_barang FROM barang WHERE id = ?', [barang_id]);
+    if (!barang) return res.status(404).json({ message: 'Barang not found' });
+    
+    let dateStr = '';
+    if (tgl_masuk) {
+      dateStr = tgl_masuk.replace(/-/g, '');
+    } else {
+      const today = new Date();
+      dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+    }
+
+    const no_batch = `${barang.kode_barang}-${dateStr}-${Math.floor(Math.random() * 1000)}`;
+
+    const query = `
+      INSERT INTO barang_batch (barang_id, no_batch, barcode_batch, stok_batch, tgl_masuk, tgl_expired, supplier_id, harga_beli_aktual)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const result = await db.run(query, [
+      barang_id, no_batch, barcode_batch, stok_batch, 
+      tgl_masuk || new Date().toISOString().split('T')[0], 
+      tgl_expired, supplier_id || null, harga_beli_aktual || null
+    ]);
+
+    res.status(201).json({ id: result.lastID, message: 'Batch created' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error creating batch' });
+  }
+};
+
+exports.getRiwayatHarga = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDB();
+    const rows = await db.all(`
+      SELECT bb.id, bb.tgl_masuk, bb.harga_beli_aktual, s.nama_supplier 
+      FROM barang_batch bb
+      LEFT JOIN supplier s ON bb.supplier_id = s.id
+      WHERE bb.barang_id = ? AND bb.harga_beli_aktual IS NOT NULL
+      ORDER BY bb.tgl_masuk DESC
+    `, [id]);
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching riwayat harga' });
+  }
+};
