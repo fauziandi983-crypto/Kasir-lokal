@@ -8,7 +8,7 @@ exports.getAllBarang = async (req, res) => {
       FROM barang b 
       LEFT JOIN barang_batch bb ON b.id = bb.barang_id AND bb.stok_batch > 0 AND bb.tgl_expired >= CURRENT_DATE
       LEFT JOIN supplier s ON b.supplier_id = s.id
-      GROUP BY b.id 
+      GROUP BY b.id, s.nama_supplier
       ORDER BY b.nama_barang ASC
     `);
     res.json(rows);
