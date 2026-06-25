@@ -23,12 +23,15 @@ app.use('/api/supplier', require('./routes/supplier'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 // app.use('/api/pelanggan', require('./routes/pelanggan')); // To be implemented
 
-// Start Server
-async function startServer() {
-  await initializeDatabase();
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
+// Start Server locally, but export for Vercel
+if (process.env.NODE_ENV !== 'production') {
+  async function startServer() {
+    await initializeDatabase();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  }
+  startServer();
 }
 
-startServer();
+module.exports = app;
