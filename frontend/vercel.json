@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://kasir-lokal-4t1wb1o86-fauzi-andi.vercel.app/api/:path*"
+      "destination": "https://kasir-lokal.vercel.app/api/:path*"
     },
     {
       "source": "/(.*)",
