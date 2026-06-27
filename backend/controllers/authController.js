@@ -166,9 +166,9 @@ exports.getUsers = async (req, res) => {
     if (req.user.role === 'owner') {
       users = await db.all('SELECT u.id, u.username, u.role, u.created_at, b.nama_klien, t.nama_toko FROM users u LEFT JOIN business b ON u.business_id = b.id LEFT JOIN toko t ON u.toko_id = t.id ORDER BY u.created_at DESC');
     } else if (req.user.role === 'superadmin') {
-      users = await db.all('SELECT u.id, u.username, u.role, u.created_at, t.nama_toko FROM users u LEFT JOIN toko t ON u.toko_id = t.id WHERE u.business_id = ? AND u.role IN ("toko", "kasir") ORDER BY u.created_at DESC', [req.user.business_id]);
+      users = await db.all("SELECT u.id, u.username, u.role, u.created_at, t.nama_toko FROM users u LEFT JOIN toko t ON u.toko_id = t.id WHERE u.business_id = ? AND u.role IN ('toko', 'kasir') ORDER BY u.created_at DESC", [req.user.business_id]);
     } else if (req.user.role === 'toko') {
-      users = await db.all('SELECT id, username, role, created_at FROM users WHERE toko_id = ? AND role = "kasir" ORDER BY created_at DESC', [req.user.toko_id]);
+      users = await db.all("SELECT id, username, role, created_at FROM users WHERE toko_id = ? AND role = 'kasir' ORDER BY created_at DESC", [req.user.toko_id]);
     }
     res.json(users);
   } catch (error) {

@@ -82,16 +82,31 @@ function TokoSettings({ currentUser }) {
         </div>
 
         <div style={{ marginBottom: '24px' }}>
-          <label>Logo URL (Opsional)</label>
+          <label>Logo Toko</label>
           <input 
-            type="text" 
-            value={formData.logo} 
-            onChange={e => setFormData({ ...formData, logo: e.target.value })} 
-            placeholder="https://contoh.com/logo.png"
+            type="file" 
+            accept="image/*"
+            onChange={e => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  setFormData({ ...formData, logo: reader.result });
+                };
+                reader.readAsDataURL(file);
+              }
+            }}
           />
           {formData.logo && (
             <div style={{ marginTop: '8px' }}>
               <img src={formData.logo} alt="Preview Logo" style={{ maxHeight: '60px', borderRadius: '8px' }} />
+              <button 
+                type="button" 
+                onClick={() => setFormData({ ...formData, logo: '' })}
+                className="btn btn-danger" 
+                style={{ marginLeft: '12px', padding: '4px 8px', fontSize: '12px' }}>
+                Hapus Logo
+              </button>
             </div>
           )}
         </div>
