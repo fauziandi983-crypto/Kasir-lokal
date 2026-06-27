@@ -21,6 +21,7 @@ app.use('/api/barang', require('./routes/barang'));
 app.use('/api/transaksi', require('./routes/transaksi')); 
 app.use('/api/supplier', require('./routes/supplier'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/toko', require('./routes/toko'));
 // app.use('/api/pelanggan', require('./routes/pelanggan')); // To be implemented
 
 // Start Server locally, but export for Vercel

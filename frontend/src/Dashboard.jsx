@@ -129,6 +129,7 @@ function Dashboard() {
 
       <div className="grid-2fr-1fr" style={{ display: 'grid', gap: '24px' }}>
         {/* CHART SECTION */}
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <h3 style={{ marginBottom: '24px' }}>Tren Penjualan ({
             timeFilter === 'mingguan' ? '7 Hari Terakhir' : 
             timeFilter === 'bulanan' ? '30 Hari Terakhir' : 

@@ -17,21 +17,31 @@ exports.getSummary = async (req, res) => {
     const filter = req.query.filter || 'bulanan';
     const intervalSql = getFilterInterval(filter);
     
+    let filterCondition = '1=1';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      filterCondition = 'business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      filterCondition = 'toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     // 1. Pendapatan Hari Ini
     const today = new Date().toISOString().split('T')[0];
     const revTodayRow = await db.get(`
       SELECT SUM(total_belanja) as total 
       FROM transaksi 
-      WHERE DATE(waktu_transaksi) = ?
-    `, [today]);
+      WHERE DATE(waktu_transaksi) = ? AND ${filterCondition}
+    `, [today, ...params]);
     const pendapatan_hari_ini = parseFloat(revTodayRow?.total || 0);
 
     // 2. Pendapatan Periode & Transaksi Periode
     const revPeriodRow = await db.get(`
       SELECT SUM(total_belanja) as total, COUNT(id) as count 
       FROM transaksi 
-      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
-    `);
+      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - ${intervalSql} AND ${filterCondition}
+    `, [...params]);
     const pendapatan_bulan_ini = parseFloat(revPeriodRow?.total || 0);
     const transaksi_bulan_ini = parseInt(revPeriodRow?.count || 0, 10);
 
@@ -42,8 +52,8 @@ exports.getSummary = async (req, res) => {
       JOIN transaksi t ON td.transaksi_id = t.id
       LEFT JOIN barang_batch bb ON td.batch_id = bb.id
       LEFT JOIN barang b ON td.barang_id = b.id
-      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
-    `);
+      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql} AND t.${filterCondition}
+    `, [...params]);
     const keuntungan_bulan_ini = parseFloat(profitRow?.keuntungan || 0);
 
     // 4. Saldo Toko (Nilai Aset Stok Saat Ini)
@@ -51,8 +61,8 @@ exports.getSummary = async (req, res) => {
       SELECT SUM(bb.stok_batch * COALESCE(bb.harga_beli_aktual, b.harga_beli)) as total 
       FROM barang_batch bb
       JOIN barang b ON bb.barang_id = b.id
-      WHERE bb.stok_batch > 0
-    `);
+      WHERE bb.stok_batch > 0 AND b.${filterCondition}
+    `, [...params]);
     const saldo_toko = parseFloat(saldoRow?.total || 0);
 
     res.json({
@@ -75,16 +85,26 @@ exports.getBestSellers = async (req, res) => {
     const filter = req.query.filter || 'bulanan';
     const intervalSql = getFilterInterval(filter);
 
+    let filterCondition = '1=1';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      filterCondition = 't.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      filterCondition = 't.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     const rows = await db.all(`
       SELECT b.nama_barang, b.satuan_pecahan, SUM(td.jumlah_beli) as total_terjual 
       FROM transaksi_detail td
       JOIN transaksi t ON td.transaksi_id = t.id
       JOIN barang b ON td.barang_id = b.id
-      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
+      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql} AND ${filterCondition}
       GROUP BY b.id
       ORDER BY total_terjual DESC
       LIMIT 5
-    `);
+    `, params);
     
     res.json(rows.map(r => ({ ...r, total_terjual: parseFloat(r.total_terjual) })));
   } catch (error) {
@@ -120,13 +140,23 @@ exports.getSalesChart = async (req, res) => {
       groupSql = `TO_CHAR(waktu_transaksi, 'YYYY-MM')`;
     }
 
+    let filterCondition = '1=1';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      filterCondition = 'business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      filterCondition = 'toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     const rows = await db.all(`
       SELECT ${groupSql} as tanggal, SUM(total_belanja) as total 
       FROM transaksi 
-      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
+      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - ${intervalSql} AND ${filterCondition}
       GROUP BY ${groupSql}
       ORDER BY ${groupSql} ASC
-    `);
+    `, params);
     
     // Instead of filling missing days for all ranges (which is complex for months),
     // let's just return the aggregated rows and the frontend will render them.
@@ -147,12 +177,23 @@ exports.getLowStockRecommendations = async (req, res) => {
   try {
     const db = await getDB();
     
+    let filterCondition = '1=1';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      filterCondition = 'b.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      filterCondition = 'b.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     // Find items with total_stok <= stok_minimum OR total_stok == 0
     const lowStockItems = await db.all(`
       SELECT b.id, b.kode_barang, b.nama_barang, b.satuan_pecahan, COALESCE(b.stok_minimum, 0) as stok_minimum,
              COALESCE((SELECT SUM(stok_batch) FROM barang_batch WHERE barang_id = b.id AND stok_batch > 0 AND tgl_expired >= CURRENT_DATE), 0) AS total_stok
       FROM barang b
-    `);
+      WHERE ${filterCondition}
+    `, params);
 
     const needsRestock = lowStockItems.filter(item => item.total_stok === 0 || item.total_stok <= item.stok_minimum);
 
@@ -184,14 +225,25 @@ exports.getLowStockRecommendations = async (req, res) => {
 exports.getExpiringItems = async (req, res) => {
   try {
     const db = await getDB();
+    let filterCondition = '1=1';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      filterCondition = 'b.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      filterCondition = 'b.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     const rows = await db.all(`
       SELECT b.nama_barang, bb.no_batch, bb.tgl_expired, bb.stok_batch, b.satuan_pecahan
       FROM barang_batch bb
       JOIN barang b ON bb.barang_id = b.id
       WHERE bb.stok_batch > 0 
         AND bb.tgl_expired <= CURRENT_DATE + INTERVAL '7 days'
+        AND ${filterCondition}
       ORDER BY bb.tgl_expired ASC
-    `);
+    `, params);
     res.json(rows);
   } catch (error) {
     console.error(error);

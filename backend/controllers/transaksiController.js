@@ -15,11 +15,11 @@ exports.checkout = async (req, res) => {
 
     let final_pelanggan_id = pelanggan_id || null;
     if (pelanggan_nama && pelanggan_nama.trim() !== '') {
-      const existingPelanggan = await db.get('SELECT id FROM pelanggan WHERE nama_pelanggan ILIKE ?', [pelanggan_nama.trim()]);
+      const existingPelanggan = await db.get('SELECT id FROM pelanggan WHERE nama_pelanggan ILIKE ? AND business_id = ?', [pelanggan_nama.trim(), req.user.business_id]);
       if (existingPelanggan) {
         final_pelanggan_id = existingPelanggan.id;
       } else {
-        const pResult = await db.run('INSERT INTO pelanggan (nama_pelanggan, tipe_pelanggan) VALUES (?, ?) RETURNING id', [pelanggan_nama.trim(), is_mode_pedagang ? 'pedagang' : 'biasa']);
+        const pResult = await db.run('INSERT INTO pelanggan (nama_pelanggan, tipe_pelanggan, business_id, toko_id) VALUES (?, ?, ?, ?) RETURNING id', [pelanggan_nama.trim(), is_mode_pedagang ? 'pedagang' : 'biasa', req.user.business_id, req.user.toko_id]);
         final_pelanggan_id = pResult.lastID;
       }
     }
@@ -31,9 +31,9 @@ exports.checkout = async (req, res) => {
 
     // Create Transaksi Header
     const trxResult = await db.run(`
-      INSERT INTO transaksi (nota_nomor, user_id, pelanggan_id, total_belanja, total_diskon, uang_bayar, uang_kembalian, is_mode_pedagang)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-    `, [nota_nomor, user_id || null, final_pelanggan_id, 0, 0, uang_bayar, 0, isModePedagangInt]);
+      INSERT INTO transaksi (nota_nomor, user_id, pelanggan_id, total_belanja, total_diskon, uang_bayar, uang_kembalian, is_mode_pedagang, business_id, toko_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+    `, [nota_nomor, user_id || null, final_pelanggan_id, 0, 0, uang_bayar, 0, isModePedagangInt, req.user.business_id, req.user.toko_id]);
     
     const transaksi_id = trxResult.lastID;
 
@@ -133,8 +133,14 @@ exports.getTransaksi = async (req, res) => {
     `;
     const params = [];
     
-    // RBAC: Kasir can only see their own transactions
-    if (req.user.role === 'kasir') {
+    // RBAC
+    if (req.user.role === 'superadmin') {
+      query += " AND t.business_id = ?";
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko') {
+      query += " AND t.toko_id = ?";
+      params.push(req.user.toko_id);
+    } else if (req.user.role === 'kasir') {
       query += " AND t.user_id = ?";
       params.push(req.user.id);
     }

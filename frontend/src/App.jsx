@@ -8,6 +8,8 @@ import Dashboard from './Dashboard';
 import BarcodeScanner from './components/BarcodeScanner';
 import Login from './Login';
 import UserManagement from './UserManagement';
+import SuperAdminDashboard from './SuperAdminDashboard';
+import TokoSettings from './TokoSettings';
 
 const API_URL = '/api';
 axios.defaults.headers.common['Bypass-Tunnel-Reminder'] = 'true';
@@ -31,6 +33,7 @@ function App() {
   const [namaPelanggan, setNamaPelanggan] = useState('');
   const [receiptData, setReceiptData] = useState(null);
   const [isPosScannerOpen, setIsPosScannerOpen] = useState(false);
+  const [tokoProfile, setTokoProfile] = useState(null);
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -63,6 +66,14 @@ function App() {
       fetchProducts();
     }
   }, [currentTab]);
+
+  useEffect(() => {
+    if (currentUser && (currentUser.role === 'toko' || currentUser.role === 'kasir')) {
+      axios.get(`${API_URL}/toko`)
+        .then(res => setTokoProfile(res.data))
+        .catch(err => console.error("Error fetching toko profile", err));
+    }
+  }, [currentUser]);
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
@@ -188,7 +199,7 @@ function App() {
     <div className="layout">
       {/* Mobile Top Header */}
       <div className="mobile-top-header">
-        <h2>Kasir Lokal POS</h2>
+        <h2>KasirUKM POS</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '12px', fontWeight: 'normal' }}>
             {currentUser.role === 'owner' ? '👑' : '🧑‍💻'} {currentUser.username}
@@ -201,51 +212,85 @@ function App() {
 
       {/* Desktop Sidebar */}
       <div className="sidebar">
-        <h2>Kasir Lokal POS</h2>
+        <h2>KasirUKM</h2>
         
         <div className="sidebar-menu">
-          <button 
-            className={`btn ${currentTab === 'dashboard' ? 'btn-success' : ''}`}
-            onClick={() => setCurrentTab('dashboard')}
-            style={{ justifyContent: 'flex-start', background: currentTab === 'dashboard' ? '' : 'rgba(255,255,255,0.1)' }}
-          >
-            📈 Dashboard Analitik
-          </button>
-          <button 
-            className={`btn ${currentTab === 'pos' ? 'btn-success' : ''}`}
-            onClick={() => setCurrentTab('pos')}
-            style={{ justifyContent: 'flex-start', background: currentTab === 'pos' ? '' : 'rgba(255,255,255,0.1)' }}
-          >
-            🛒 Transaksi Kasir
-          </button>
-          <button 
-            className={`btn ${currentTab === 'inventory' ? 'btn-success' : ''}`}
-            onClick={() => setCurrentTab('inventory')}
-            style={{ justifyContent: 'flex-start', background: currentTab === 'inventory' ? '' : 'rgba(255,255,255,0.1)' }}
-          >
-            📦 Master Barang
-          </button>
-          <button 
-            className={`btn ${currentTab === 'monitoring' ? 'btn-success' : ''}`}
-            onClick={() => setCurrentTab('monitoring')}
-            style={{ justifyContent: 'flex-start', background: currentTab === 'monitoring' ? '' : 'rgba(255,255,255,0.1)' }}
-          >
-            📊 Monitoring Stok
-          </button>
-          <button 
-            className={`btn ${currentTab === 'laporan' ? 'btn-success' : ''}`}
-            onClick={() => setCurrentTab('laporan')}
-            style={{ justifyContent: 'flex-start', background: currentTab === 'laporan' ? '' : 'rgba(255,255,255,0.1)' }}
-          >
-            📋 Laporan Transaksi
-          </button>
+          {currentUser.role === 'superadmin' && (
+            <button 
+              className={`btn ${currentTab === 'superadmin' ? 'btn-success' : ''}`}
+              onClick={() => setCurrentTab('superadmin')}
+              style={{ justifyContent: 'flex-start', background: currentTab === 'superadmin' ? '' : 'rgba(255,255,255,0.1)' }}
+            >
+              🏢 Dashboard Pusat
+            </button>
+          )}
+
+          {currentUser.role !== 'owner' && currentUser.role !== 'superadmin' && (
+            <>
+              <button 
+                className={`btn ${currentTab === 'dashboard' ? 'btn-success' : ''}`}
+                onClick={() => setCurrentTab('dashboard')}
+                style={{ justifyContent: 'flex-start', background: currentTab === 'dashboard' ? '' : 'rgba(255,255,255,0.1)' }}
+              >
+                📈 Dashboard Toko
+              </button>
+              <button 
+                className={`btn ${currentTab === 'pos' ? 'btn-success' : ''}`}
+                onClick={() => setCurrentTab('pos')}
+                style={{ justifyContent: 'flex-start', background: currentTab === 'pos' ? '' : 'rgba(255,255,255,0.1)' }}
+              >
+                🛒 Transaksi Kasir
+              </button>
+              <button 
+                className={`btn ${currentTab === 'inventory' ? 'btn-success' : ''}`}
+                onClick={() => setCurrentTab('inventory')}
+                style={{ justifyContent: 'flex-start', background: currentTab === 'inventory' ? '' : 'rgba(255,255,255,0.1)' }}
+              >
+                📦 Master Barang
+              </button>
+              <button 
+                className={`btn ${currentTab === 'monitoring' ? 'btn-success' : ''}`}
+                onClick={() => setCurrentTab('monitoring')}
+                style={{ justifyContent: 'flex-start', background: currentTab === 'monitoring' ? '' : 'rgba(255,255,255,0.1)' }}
+              >
+                📊 Monitoring Stok
+              </button>
+              <button 
+                className={`btn ${currentTab === 'laporan' ? 'btn-success' : ''}`}
+                onClick={() => setCurrentTab('laporan')}
+                style={{ justifyContent: 'flex-start', background: currentTab === 'laporan' ? '' : 'rgba(255,255,255,0.1)' }}
+              >
+                📋 Laporan Transaksi
+              </button>
+            </>
+          )}
+
+          {currentUser.role === 'toko' && (
+            <>
+              <button 
+                className={`btn ${currentTab === 'toko_settings' ? 'btn-success' : ''}`}
+                onClick={() => setCurrentTab('toko_settings')}
+                style={{ justifyContent: 'flex-start', background: currentTab === 'toko_settings' ? '' : 'rgba(255,255,255,0.1)' }}
+              >
+                ⚙️ Profil Toko
+              </button>
+              <button 
+                className={`btn ${currentTab === 'users' ? 'btn-success' : ''}`}
+                onClick={() => setCurrentTab('users')}
+                style={{ justifyContent: 'flex-start', background: currentTab === 'users' ? '' : 'rgba(255,255,255,0.1)' }}
+              >
+                👥 Kelola Kasir
+              </button>
+            </>
+          )}
+
           {currentUser.role === 'owner' && (
             <button 
               className={`btn ${currentTab === 'users' ? 'btn-success' : ''}`}
               onClick={() => setCurrentTab('users')}
               style={{ justifyContent: 'flex-start', background: currentTab === 'users' ? '' : 'rgba(255,255,255,0.1)' }}
             >
-              👥 Kelola User
+              👥 Kelola Klien
             </button>
           )}
         </div>
@@ -289,11 +334,13 @@ function App() {
       </div>
       
       <div className="main-content">
+        {currentTab === 'superadmin' && currentUser.role === 'superadmin' && <SuperAdminDashboard />}
+        {currentTab === 'toko_settings' && currentUser.role === 'toko' && <TokoSettings currentUser={currentUser} />}
         {currentTab === 'dashboard' && <Dashboard />}
         {currentTab === 'inventory' && <Inventory />}
         {currentTab === 'monitoring' && <MonitoringStok />}
         {currentTab === 'laporan' && <LaporanTransaksi />}
-        {currentTab === 'users' && currentUser.role === 'owner' && <UserManagement />}
+        {currentTab === 'users' && <UserManagement currentUser={currentUser} />}
         
         {currentTab === 'pos' && (
           <div className="pos-grid">
@@ -470,8 +517,16 @@ function App() {
       {receiptData && (
         <div className="receipt-overlay">
           <div className="receipt-modal printable-receipt">
-            <h2 style={{ textAlign: 'center', marginBottom: '4px' }}>KASIR LOKAL</h2>
-            <p style={{ textAlign: 'center', fontSize: '12px', color: '#666', borderBottom: '1px dashed #ccc', paddingBottom: '12px', marginBottom: '12px' }}>
+            {tokoProfile?.logo && (
+              <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                <img src={tokoProfile.logo} alt="Logo" style={{ maxHeight: '60px' }} />
+              </div>
+            )}
+            <h2 style={{ textAlign: 'center', marginBottom: '4px' }}>{tokoProfile?.nama_toko || 'KASIR LOKAL'}</h2>
+            <p style={{ textAlign: 'center', fontSize: '12px', color: '#666', borderBottom: '1px dashed #ccc', paddingBottom: '12px', marginBottom: '12px', lineHeight: '1.4' }}>
+              {tokoProfile?.alamat && <>{tokoProfile.alamat}<br/></>}
+              {tokoProfile?.no_hp && <>{tokoProfile.no_hp}<br/></>}
+              <br/>
               Nota: {receiptData.nota_nomor}<br/>
               Waktu: {receiptData.date}<br/>
               {receiptData.pelanggan && <>Pelanggan: {receiptData.pelanggan}</>}
@@ -509,6 +564,7 @@ function App() {
             </div>
             
             <p style={{ textAlign: 'center', fontSize: '12px', marginTop: '12px' }}>Terima kasih atas kunjungan Anda!</p>
+            <p style={{ textAlign: 'center', fontSize: '10px', color: '#999', marginTop: '16px' }}>Powered by KasirUKM</p>
             
             <div className="no-print" style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button className="btn btn-success" style={{ flex: 1 }} onClick={() => window.print()}>🖨️ Print PDF</button>

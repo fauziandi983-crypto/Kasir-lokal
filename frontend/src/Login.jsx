@@ -7,7 +7,7 @@ function Login({ onLoginSuccess }) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('owner');
+  const [namaKlien, setNamaKlien] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -20,7 +20,7 @@ function Login({ onLoginSuccess }) {
     
     try {
       if (isRegistering) {
-        await axios.post(`${API_URL}/auth/register`, { username, password, role });
+        await axios.post(`${API_URL}/auth/register-public`, { username, password, nama_klien: namaKlien });
         setSuccess('Pendaftaran berhasil! Silakan login.');
         setIsRegistering(false);
         setPassword('');
@@ -77,10 +77,10 @@ function Login({ onLoginSuccess }) {
             color: '#f1f5f9',
             margin: '0 0 6px'
           }}>
-            {isRegistering ? 'Daftar Akun Baru' : 'Sistem Kasir POS'}
+            {isRegistering ? 'Daftar Klien KasirUKM' : 'Sistem KasirUKM'}
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
-            {isRegistering ? 'Lengkapi data untuk mendaftar' : 'Silakan masuk untuk melanjutkan'}
+            {isRegistering ? 'Lengkapi data usaha Anda untuk mendaftar' : 'Silakan masuk untuk melanjutkan'}
           </p>
         </div>
 
@@ -174,11 +174,14 @@ function Login({ onLoginSuccess }) {
           {isRegistering && (
             <div style={{ marginBottom: '28px' }}>
               <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
-                Role Akun
+                Nama Usaha / Perusahaan
               </label>
-              <select
-                value={role}
-                onChange={e => setRole(e.target.value)}
+              <input
+                type="text"
+                value={namaKlien}
+                onChange={e => setNamaKlien(e.target.value)}
+                placeholder="Masukkan nama usaha Anda"
+                required
                 style={{
                   width: '100%',
                   padding: '14px 16px',
@@ -189,13 +192,11 @@ function Login({ onLoginSuccess }) {
                   fontSize: '15px',
                   outline: 'none',
                   transition: 'border-color 0.2s',
-                  boxSizing: 'border-box',
-                  appearance: 'none'
+                  boxSizing: 'border-box'
                 }}
-              >
-                <option value="owner">Owner (Pemilik Toko)</option>
-                <option value="kasir">Kasir (Staf Toko)</option>
-              </select>
+                onFocus={e => e.target.style.borderColor = '#10b981'}
+                onBlur={e => e.target.style.borderColor = 'rgba(148, 163, 184, 0.2)'}
+              />
             </div>
           )}
 
@@ -241,7 +242,7 @@ function Login({ onLoginSuccess }) {
         </div>
 
         <p style={{ textAlign: 'center', color: '#475569', fontSize: '12px', marginTop: '24px' }}>
-          © 2026 Sistem Kasir POS
+          © 2026 KasirUKM. All rights reserved.
         </p>
       </div>
     </div>

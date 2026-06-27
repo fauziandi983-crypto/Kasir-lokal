@@ -13,17 +13,25 @@ const verifyToken = (req, res, next) => {
   try {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    req.user = decoded; // Contains id, username, role, business_id, toko_id
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Token tidak valid atau sudah kedaluwarsa' });
   }
 };
 
-// Middleware: Only Owner
+// Middleware: Only Owner (Root)
 const ownerOnly = (req, res, next) => {
   if (req.user.role !== 'owner') {
-    return res.status(403).json({ message: 'Hanya owner yang bisa melakukan aksi ini' });
+    return res.status(403).json({ message: 'Hanya root owner yang bisa melakukan aksi ini' });
+  }
+  next();
+};
+
+// Middleware: SuperAdmin Only
+const superAdminOnly = (req, res, next) => {
+  if (req.user.role !== 'superadmin' && req.user.role !== 'owner') {
+    return res.status(403).json({ message: 'Hanya superadmin yang bisa melakukan aksi ini' });
   }
   next();
 };
@@ -44,8 +52,15 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Username atau password salah' });
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: '1d' });
-    res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+    const payload = { 
+      id: user.id, 
+      role: user.role, 
+      username: user.username,
+      business_id: user.business_id,
+      toko_id: user.toko_id
+    };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
+    res.json({ token, user: payload });
 
   } catch (error) {
     console.error('Login error:', error);
@@ -57,7 +72,7 @@ exports.login = async (req, res) => {
 exports.me = async (req, res) => {
   try {
     const db = await getDB();
-    const user = await db.get('SELECT id, username, role, created_at FROM users WHERE id = ?', [req.user.id]);
+    const user = await db.get('SELECT id, username, role, business_id, toko_id, created_at FROM users WHERE id = ?', [req.user.id]);
     if (!user) {
       return res.status(404).json({ message: 'User tidak ditemukan' });
     }
@@ -68,44 +83,93 @@ exports.me = async (req, res) => {
   }
 };
 
-// POST /api/auth/register - Create new user (owner only)
-exports.register = async (req, res) => {
+// POST /api/auth/register-public (Client Registers as Super Admin)
+exports.registerPublic = async (req, res) => {
   try {
-    const { username, password, role } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username dan password wajib diisi' });
-    }
-    if (!['owner', 'kasir'].includes(role)) {
-      return res.status(400).json({ message: 'Role harus owner atau kasir' });
-    }
+    const { username, password, nama_klien } = req.body;
+    if (!username || !password || !nama_klien) return res.status(400).json({ message: 'Username, password, dan nama klien wajib diisi' });
 
     const db = await getDB();
-    
-    // Check if username already exists
     const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
-    if (existing) {
-      return res.status(400).json({ message: 'Username sudah digunakan' });
-    }
+    if (existing) return res.status(400).json({ message: 'Username sudah digunakan' });
 
     const password_hash = await bcrypt.hash(password, 10);
-    const result = await db.run(
-      'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-      [username, password_hash, role]
-    );
+    
+    // Create Business
+    const bizRes = await db.run('INSERT INTO business (nama_klien) VALUES (?) RETURNING id', [nama_klien]);
+    const business_id = bizRes.lastID || (await db.get("SELECT MAX(id) as id FROM business")).id;
 
-    res.status(201).json({ id: result.lastID, username, role, message: 'User berhasil dibuat' });
+    // Create Super Admin user
+    const result = await db.run(
+      'INSERT INTO users (username, password_hash, role, business_id) VALUES (?, ?, ?, ?) RETURNING id',
+      [username, password_hash, 'superadmin', business_id]
+    );
+    const user_id = result.lastID || (await db.get("SELECT MAX(id) as id FROM users")).id;
+
+    res.status(201).json({ message: 'Pendaftaran berhasil. Silakan login.', user_id });
+  } catch (error) {
+    console.error('Register Public error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// POST /api/auth/register (Create sub-users from dashboard)
+exports.register = async (req, res) => {
+  try {
+    const { username, password, role, toko_id, nama_toko } = req.body; // toko_id for kasir, nama_toko for toko
+    
+    if (!username || !password) return res.status(400).json({ message: 'Username dan password wajib diisi' });
+
+    const db = await getDB();
+    const existing = await db.get('SELECT id FROM users WHERE username = ?', [username]);
+    if (existing) return res.status(400).json({ message: 'Username sudah digunakan' });
+
+    const password_hash = await bcrypt.hash(password, 10);
+    const business_id = req.user.business_id;
+
+    if (req.user.role === 'superadmin') {
+      if (role === 'toko') {
+        if (!nama_toko) return res.status(400).json({ message: 'Nama toko wajib diisi' });
+        // Create Toko record
+        const tRes = await db.run('INSERT INTO toko (business_id, nama_toko) VALUES (?, ?) RETURNING id', [business_id, nama_toko]);
+        const new_toko_id = tRes.lastID || (await db.get("SELECT MAX(id) as id FROM toko")).id;
+        // Create Toko user
+        await db.run('INSERT INTO users (username, password_hash, role, business_id, toko_id) VALUES (?, ?, ?, ?, ?)',
+          [username, password_hash, 'toko', business_id, new_toko_id]);
+      } else if (role === 'kasir') {
+        if (!toko_id) return res.status(400).json({ message: 'Toko ID wajib diisi untuk membuat kasir' });
+        await db.run('INSERT INTO users (username, password_hash, role, business_id, toko_id) VALUES (?, ?, ?, ?, ?)',
+          [username, password_hash, 'kasir', business_id, toko_id]);
+      } else {
+        return res.status(400).json({ message: 'Role tidak valid' });
+      }
+    } else if (req.user.role === 'toko') {
+      if (role !== 'kasir') return res.status(403).json({ message: 'Toko hanya bisa membuat akun kasir' });
+      await db.run('INSERT INTO users (username, password_hash, role, business_id, toko_id) VALUES (?, ?, ?, ?, ?)',
+        [username, password_hash, 'kasir', business_id, req.user.toko_id]);
+    } else {
+      return res.status(403).json({ message: 'Anda tidak memiliki akses' });
+    }
+
+    res.status(201).json({ message: 'User berhasil dibuat' });
   } catch (error) {
     console.error('Register error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// GET /api/auth/users - List all users (owner only)
+// GET /api/auth/users - List users within the same business
 exports.getUsers = async (req, res) => {
   try {
     const db = await getDB();
-    const users = await db.all('SELECT id, username, role, created_at FROM users ORDER BY created_at DESC');
+    let users = [];
+    if (req.user.role === 'owner') {
+      users = await db.all('SELECT u.id, u.username, u.role, u.created_at, b.nama_klien, t.nama_toko FROM users u LEFT JOIN business b ON u.business_id = b.id LEFT JOIN toko t ON u.toko_id = t.id ORDER BY u.created_at DESC');
+    } else if (req.user.role === 'superadmin') {
+      users = await db.all('SELECT u.id, u.username, u.role, u.created_at, t.nama_toko FROM users u LEFT JOIN toko t ON u.toko_id = t.id WHERE u.business_id = ? AND u.role IN ("toko", "kasir") ORDER BY u.created_at DESC', [req.user.business_id]);
+    } else if (req.user.role === 'toko') {
+      users = await db.all('SELECT id, username, role, created_at FROM users WHERE toko_id = ? AND role = "kasir" ORDER BY created_at DESC', [req.user.toko_id]);
+    }
     res.json(users);
   } catch (error) {
     console.error('Get users error:', error);
@@ -113,21 +177,19 @@ exports.getUsers = async (req, res) => {
   }
 };
 
-// DELETE /api/auth/users/:id - Delete user (owner only)
+// DELETE /api/auth/users/:id
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Prevent deleting self
-    if (parseInt(id) === req.user.id) {
-      return res.status(400).json({ message: 'Tidak bisa menghapus akun Anda sendiri' });
-    }
+    if (parseInt(id) === req.user.id) return res.status(400).json({ message: 'Tidak bisa menghapus akun Anda sendiri' });
 
     const db = await getDB();
-    const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
-    if (!user) {
-      return res.status(404).json({ message: 'User tidak ditemukan' });
-    }
+    const targetUser = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+    if (!targetUser) return res.status(404).json({ message: 'User tidak ditemukan' });
+
+    // Permissions check
+    if (req.user.role === 'superadmin' && targetUser.business_id !== req.user.business_id) return res.status(403).json({ message: 'Akses ditolak' });
+    if (req.user.role === 'toko' && targetUser.toko_id !== req.user.toko_id) return res.status(403).json({ message: 'Akses ditolak' });
 
     await db.run('DELETE FROM users WHERE id = ?', [id]);
     res.json({ message: 'User berhasil dihapus' });
@@ -139,3 +201,4 @@ exports.deleteUser = async (req, res) => {
 
 exports.verifyToken = verifyToken;
 exports.ownerOnly = ownerOnly;
+exports.superAdminOnly = superAdminOnly;

@@ -3,14 +3,26 @@ const { getDB } = require('../db');
 exports.getAllBarang = async (req, res) => {
   try {
     const db = await getDB();
+    let condition = 'WHERE 1=1';
+    let params = [];
+
+    if (req.user.role === 'superadmin') {
+      condition = 'WHERE b.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      condition = 'WHERE b.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     const rows = await db.all(`
       SELECT b.*, COALESCE(SUM(bb.stok_batch), 0) AS total_stok, s.nama_supplier 
       FROM barang b 
       LEFT JOIN barang_batch bb ON b.id = bb.barang_id AND bb.stok_batch > 0 AND bb.tgl_expired >= CURRENT_DATE
       LEFT JOIN supplier s ON b.supplier_id = s.id
+      ${condition}
       GROUP BY b.id, s.nama_supplier
       ORDER BY b.nama_barang ASC
-    `);
+    `, params);
     res.json(rows);
   } catch (error) {
     console.error(error);
@@ -21,12 +33,22 @@ exports.getAllBarang = async (req, res) => {
 exports.previewExpired = async (req, res) => {
   try {
     const db = await getDB();
+    let condition = 'WHERE bb.tgl_expired < CURRENT_DATE AND bb.stok_batch > 0';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      condition += ' AND b.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      condition += ' AND b.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     const expiredBatches = await db.all(`
       SELECT bb.id, bb.stok_batch, bb.tgl_expired, b.nama_barang, COALESCE(bb.harga_beli_aktual, b.harga_beli) as harga_modal
       FROM barang_batch bb
       JOIN barang b ON bb.barang_id = b.id
-      WHERE bb.tgl_expired < CURRENT_DATE AND bb.stok_batch > 0
-    `);
+      ${condition}
+    `, params);
     
     let totalItems = 0;
     let totalKerugian = 0;
@@ -47,13 +69,23 @@ exports.buangExpired = async (req, res) => {
   try {
     const db = await getDB();
     
+    let condition = 'WHERE bb.tgl_expired < CURRENT_DATE AND bb.stok_batch > 0';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      condition += ' AND b.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      condition += ' AND b.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     // Get all expired before zeroing
     const expiredBatches = await db.all(`
       SELECT bb.id as batch_id, bb.barang_id, bb.stok_batch, COALESCE(bb.harga_beli_aktual, b.harga_beli) as harga_modal, b.nama_barang
       FROM barang_batch bb
       JOIN barang b ON bb.barang_id = b.id
-      WHERE bb.tgl_expired < CURRENT_DATE AND bb.stok_batch > 0
-    `);
+      ${condition}
+    `, params);
     
     if (expiredBatches.length === 0) {
       return res.json({ message: 'Tidak ada stok kedaluwarsa yang perlu dibuang.' });
@@ -66,9 +98,9 @@ exports.buangExpired = async (req, res) => {
     for (const batch of expiredBatches) {
       const kerugian = batch.stok_batch * batch.harga_modal;
       await db.run(`
-        INSERT INTO log_kerugian (barang_id, batch_id, jumlah_stok_terbuang, nilai_kerugian_rp, keterangan)
-        VALUES (?, ?, ?, ?, ?)
-      `, [batch.barang_id, batch.batch_id, batch.stok_batch, kerugian, `Stok expired: ${batch.nama_barang}`]);
+        INSERT INTO log_kerugian (barang_id, batch_id, jumlah_stok_terbuang, nilai_kerugian_rp, keterangan, business_id, toko_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [batch.barang_id, batch.batch_id, batch.stok_batch, kerugian, `Stok expired: ${batch.nama_barang}`, req.user.business_id, req.user.toko_id]);
       
       totalTerbuang += batch.stok_batch;
     }
@@ -88,12 +120,23 @@ exports.buangExpired = async (req, res) => {
 exports.getLaporanKerugian = async (req, res) => {
   try {
     const db = await getDB();
+    let condition = 'WHERE 1=1';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      condition = 'WHERE l.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      condition = 'WHERE l.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     const rows = await db.all(`
       SELECT l.*, b.nama_barang 
       FROM log_kerugian l
       LEFT JOIN barang b ON l.barang_id = b.id
+      ${condition}
       ORDER BY l.tanggal DESC
-    `);
+    `, params);
     res.json(rows);
   } catch (error) {
     console.error(error);
@@ -104,15 +147,25 @@ exports.getLaporanKerugian = async (req, res) => {
 exports.getMonitoringStok = async (req, res) => {
   try {
     const db = await getDB();
+    let condition = 'WHERE bb.stok_batch > 0';
+    let params = [];
+    if (req.user.role === 'superadmin') {
+      condition += ' AND b.business_id = ?';
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      condition += ' AND b.toko_id = ?';
+      params.push(req.user.toko_id);
+    }
+
     const rows = await db.all(`
       SELECT 
         bb.id AS batch_id, bb.no_batch, bb.stok_batch, bb.tgl_expired, bb.tgl_masuk,
         b.kode_barang, b.nama_barang, b.satuan_pecahan
       FROM barang_batch bb
       JOIN barang b ON bb.barang_id = b.id
-      WHERE bb.stok_batch > 0
+      ${condition}
       ORDER BY bb.tgl_expired ASC
-    `);
+    `, params);
     res.json(rows);
   } catch (error) {
     console.error(error);
@@ -133,13 +186,18 @@ exports.createBarang = async (req, res) => {
     db = await getDB();
     await db.run('BEGIN TRANSACTION');
 
+    let req_toko_id = req.body.toko_id;
+    if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      req_toko_id = req.user.toko_id;
+    }
+
     let supplier_id = null;
     if (nama_supplier && nama_supplier.trim()) {
-      const existing = await db.get('SELECT id FROM supplier WHERE nama_supplier ILIKE ?', [nama_supplier.trim()]);
+      const existing = await db.get('SELECT id FROM supplier WHERE nama_supplier ILIKE ? AND business_id = ?', [nama_supplier.trim(), req.user.business_id]);
       if (existing) {
         supplier_id = existing.id;
       } else {
-        const supResult = await db.run('INSERT INTO supplier (nama_supplier) VALUES (?) RETURNING id', [nama_supplier.trim()]);
+        const supResult = await db.run('INSERT INTO supplier (nama_supplier, business_id, toko_id) VALUES (?, ?, ?) RETURNING id', [nama_supplier.trim(), req.user.business_id, req_toko_id]);
         supplier_id = supResult.lastID;
       }
     }
@@ -149,14 +207,14 @@ exports.createBarang = async (req, res) => {
         kode_barang, nama_barang, kategori, satuan_utama, satuan_pecahan,
         multiplier_konversi, harga_beli, harga_jual_ecer,
         harga_jual_grosir, min_beli_grosir, stok_awal_referensi,
-        stok_minimum, supplier_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+        stok_minimum, supplier_id, business_id, toko_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
     `;
     const result = await db.run(query, [
       kode_barang, nama_barang, kategori || 'Umum', satuan_utama, satuan_pecahan,
       multiplier_konversi, harga_beli, harga_jual_ecer,
       harga_jual_grosir, min_beli_grosir, stok_awal_referensi,
-      stok_minimum || 0, supplier_id
+      stok_minimum || 0, supplier_id, req.user.business_id, req_toko_id
     ]);
 
     await db.run('COMMIT');
@@ -174,6 +232,15 @@ exports.updateHarga = async (req, res) => {
     const { harga_beli, harga_jual_ecer, harga_jual_grosir } = req.body;
 
     const db = await getDB();
+    
+    // Authorization check
+    if (req.user.role !== 'owner') {
+      const b = await db.get('SELECT business_id, toko_id FROM barang WHERE id = ?', [id]);
+      if (!b) return res.status(404).json({ message: 'Barang tidak ditemukan' });
+      if (req.user.role === 'superadmin' && b.business_id !== req.user.business_id) return res.status(403).json({ message: 'Akses ditolak' });
+      if ((req.user.role === 'toko' || req.user.role === 'kasir') && b.toko_id !== req.user.toko_id) return res.status(403).json({ message: 'Akses ditolak' });
+    }
+
     await db.run(
       'UPDATE barang SET harga_beli = ?, harga_jual_ecer = ?, harga_jual_grosir = ? WHERE id = ?',
       [harga_beli, harga_jual_ecer, harga_jual_grosir, id]
@@ -257,6 +324,15 @@ exports.deleteBarang = async (req, res) => {
   try {
     const { id } = req.params;
     const db = await getDB();
+
+    // Authorization check
+    if (req.user.role !== 'owner') {
+      const b = await db.get('SELECT business_id, toko_id FROM barang WHERE id = ?', [id]);
+      if (!b) return res.status(404).json({ message: 'Barang tidak ditemukan' });
+      if (req.user.role === 'superadmin' && b.business_id !== req.user.business_id) return res.status(403).json({ message: 'Akses ditolak' });
+      if ((req.user.role === 'toko' || req.user.role === 'kasir') && b.toko_id !== req.user.toko_id) return res.status(403).json({ message: 'Akses ditolak' });
+    }
+
     await db.run('DELETE FROM barang WHERE id = ?', [id]);
     res.json({ message: 'Barang berhasil dihapus' });
   } catch (error) {
