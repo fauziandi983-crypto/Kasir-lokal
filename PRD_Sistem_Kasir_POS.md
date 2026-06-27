@@ -48,10 +48,12 @@ Sistem harus mengecek dan memicu pengingat secara otomatis di halaman dashboard 
 
 ---
 
-## 7. MANAJEMEN PENGGUNA & HAK AKSES (RBAC)
-Aplikasi menggunakan skema Role-Based Access Control untuk memisahkan hak akses:
-* **Role Owner (Pemilik Toko):** Memiliki akses mutlak ke seluruh modul aplikasi: dashboard performa, manipulasi master barang, laporan keuangan/keuntungan, modul *Stock Adjustment*, dan manajemen akun karyawan (tambah/hapus akun kasir).
-* **Role Kasir:** Hanya diizinkan mengakses halaman antarmuka transaksi kasir (POS) dan melihat histori struk yang dibuatnya sendiri. Tidak dapat mengubah stok secara manual atau melihat laporan laba bersih toko.
+## 7. MANAJEMEN PENGGUNA & HAK AKSES (MULTI-TENANT SAAS)
+Sistem ini menggunakan arsitektur Multi-Tenant SaaS 4-tingkat:
+* **Role Owner (Root):** Memiliki akses mutlak ke seluruh database dan dapat memonitor seluruh bisnis klien dan cabang. (Sistem Root)
+* **Role Super Admin (Pemilik Bisnis):** Mendaftar secara mandiri. Membawahi banyak cabang (Toko). Dapat membuat dan memonitor seluruh toko, namun tidak dapat melakukan transaksi kasir secara langsung.
+* **Role Toko (Manajer Cabang):** Dibuat oleh Super Admin. Mengelola master barang cabangnya, logo, profil toko, dan menambah akun kasir di cabangnya.
+* **Role Kasir:** Hanya diizinkan mengakses halaman transaksi kasir (POS) dan melihat histori struk cabangnya sendiri. Tidak dapat melihat data cabang lain.
 
 ---
 
@@ -68,22 +70,49 @@ Untuk mencegah kebocoran data stok jika terdapat lebih dari 1 kasir aktif (Kasir
 Gunakan rancangan relasi tabel berikut sebagai acuan pembuatan migrasi database atau model:
 
 ```sql
--- 1. Tabel Users (Autentikasi & RBAC)
+-- 1. Tabel Business (Klien Utama / Super Admin)
+CREATE TABLE business (
+    id SERIAL PRIMARY KEY,
+    nama_klien VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 1b. Tabel Toko (Cabang)
+CREATE TABLE toko (
+    id SERIAL PRIMARY KEY,
+    business_id INT,
+    nama_toko VARCHAR(100) NOT NULL,
+    logo TEXT NULL,
+    alamat TEXT NULL,
+    no_hp VARCHAR(20) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (business_id) REFERENCES business(id)
+);
+
+-- 1c. Tabel Users (Autentikasi & RBAC Multi-Tenant)
 CREATE TABLE users (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('owner', 'kasir') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    role VARCHAR(20) CHECK (role IN ('owner', 'superadmin', 'toko', 'kasir')) NOT NULL,
+    business_id INT NULL,
+    toko_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (business_id) REFERENCES business(id),
+    FOREIGN KEY (toko_id) REFERENCES toko(id)
 );
 
 -- 2. Tabel Pelanggan (CRM)
 CREATE TABLE pelanggan (
-    id INT PRIMARY KEY AUTO_INCREMENT,
+    id SERIAL PRIMARY KEY,
     nama_pelanggan VARCHAR(100) NOT NULL,
-    tipe_pelanggan ENUM('biasa', 'pedagang') DEFAULT 'biasa',
+    tipe_pelanggan VARCHAR(20) CHECK (tipe_pelanggan IN ('biasa', 'pedagang')) DEFAULT 'biasa',
     no_telepon VARCHAR(20) NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    business_id INT NULL,
+    toko_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (business_id) REFERENCES business(id),
+    FOREIGN KEY (toko_id) REFERENCES toko(id)
 );
 
 -- 3. Tabel Barang (Master Produk)
