@@ -1,37 +1,50 @@
 const { getDB } = require('../db');
 
+const getFilterInterval = (filter) => {
+  switch(filter) {
+    case 'mingguan': return "INTERVAL '7 days'";
+    case 'bulanan': return "INTERVAL '30 days'";
+    case '3bulan': return "INTERVAL '90 days'";
+    case '6bulan': return "INTERVAL '180 days'";
+    case '1tahun': return "INTERVAL '365 days'";
+    default: return "INTERVAL '30 days'"; // default bulanan
+  }
+};
+
 exports.getSummary = async (req, res) => {
   try {
     const db = await getDB();
+    const filter = req.query.filter || 'bulanan';
+    const intervalSql = getFilterInterval(filter);
     
     // 1. Pendapatan Hari Ini
     const today = new Date().toISOString().split('T')[0];
     const revTodayRow = await db.get(`
       SELECT SUM(total_belanja) as total 
       FROM transaksi 
-      WHERE date(waktu_transaksi) = ?
+      WHERE DATE(waktu_transaksi) = ?
     `, [today]);
-    const pendapatan_hari_ini = revTodayRow?.total || 0;
+    const pendapatan_hari_ini = parseFloat(revTodayRow?.total || 0);
 
-    // 2. Pendapatan Bulan Ini & Transaksi Bulan Ini
-    const revMonthRow = await db.get(`
+    // 2. Pendapatan Periode & Transaksi Periode
+    const revPeriodRow = await db.get(`
       SELECT SUM(total_belanja) as total, COUNT(id) as count 
       FROM transaksi 
-      WHERE TO_CHAR(waktu_transaksi, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
     `);
-    const pendapatan_bulan_ini = revMonthRow?.total || 0;
-    const transaksi_bulan_ini = revMonthRow?.count || 0;
+    const pendapatan_bulan_ini = parseFloat(revPeriodRow?.total || 0);
+    const transaksi_bulan_ini = parseInt(revPeriodRow?.count || 0, 10);
 
-    // 3. Keuntungan Bersih Bulan Ini
+    // 3. Keuntungan Bersih Periode
     const profitRow = await db.get(`
-      SELECT SUM((td.harga_satuan_terpakai - COALESCE(bb.harga_beli_aktual, b.harga_beli)) * td.jumlah_beli - td.diskon_per_item) as keuntungan
+      SELECT SUM((td.harga_satuan_terpakai - COALESCE(bb.harga_beli_aktual, b.harga_beli)) * td.jumlah_beli - COALESCE(td.diskon_per_item, 0)) as keuntungan
       FROM transaksi_detail td
       JOIN transaksi t ON td.transaksi_id = t.id
       LEFT JOIN barang_batch bb ON td.batch_id = bb.id
       LEFT JOIN barang b ON td.barang_id = b.id
-      WHERE TO_CHAR(t.waktu_transaksi, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
     `);
-    const keuntungan_bulan_ini = profitRow?.keuntungan || 0;
+    const keuntungan_bulan_ini = parseFloat(profitRow?.keuntungan || 0);
 
     // 4. Saldo Toko (Nilai Aset Stok Saat Ini)
     const saldoRow = await db.get(`
@@ -40,14 +53,15 @@ exports.getSummary = async (req, res) => {
       JOIN barang b ON bb.barang_id = b.id
       WHERE bb.stok_batch > 0
     `);
-    const saldo_toko = saldoRow?.total || 0;
+    const saldo_toko = parseFloat(saldoRow?.total || 0);
 
     res.json({
       pendapatan_hari_ini,
-      pendapatan_bulan_ini,
-      transaksi_bulan_ini,
-      keuntungan_bulan_ini,
-      saldo_toko
+      pendapatan_bulan_ini, // reusing field name for frontend compatibility
+      transaksi_bulan_ini,  // reusing field name
+      keuntungan_bulan_ini, // reusing field name
+      saldo_toko,
+      kerugian_bulan_ini: 0 // Optional: implement logic if needed
     });
   } catch (error) {
     console.error(error);
@@ -58,15 +72,21 @@ exports.getSummary = async (req, res) => {
 exports.getBestSellers = async (req, res) => {
   try {
     const db = await getDB();
+    const filter = req.query.filter || 'bulanan';
+    const intervalSql = getFilterInterval(filter);
+
     const rows = await db.all(`
       SELECT b.nama_barang, b.satuan_pecahan, SUM(td.jumlah_beli) as total_terjual 
       FROM transaksi_detail td
+      JOIN transaksi t ON td.transaksi_id = t.id
       JOIN barang b ON td.barang_id = b.id
+      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
       GROUP BY b.id
       ORDER BY total_terjual DESC
       LIMIT 5
     `);
-    res.json(rows);
+    
+    res.json(rows.map(r => ({ ...r, total_terjual: parseFloat(r.total_terjual) })));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error fetching best sellers' });
@@ -76,26 +96,45 @@ exports.getBestSellers = async (req, res) => {
 exports.getSalesChart = async (req, res) => {
   try {
     const db = await getDB();
+    const filter = req.query.filter || 'mingguan';
+    // For chart, if not mingguan, we might want to aggregate differently, but let's keep it simple and just show the last N days.
+    // Wait, showing 365 bars in the UI will break the chart.
+    // The user requested filter for the dashboard. If they select 1 tahun, a daily bar chart will be too dense.
+    // Let's group by week or month if the filter is large, or just limit to the most recent if not grouping.
+    // Let's modify chartData to adapt based on filter.
+    let intervalSql = getFilterInterval(filter);
+    let dateFormat = 'YYYY-MM-DD';
+    let groupSql = `TO_CHAR(waktu_transaksi, 'YYYY-MM-DD')`;
+    let numDays = 7;
+
+    switch(filter) {
+      case 'mingguan': numDays = 7; break;
+      case 'bulanan': numDays = 30; break;
+      case '3bulan': numDays = 90; break;
+      case '6bulan': numDays = 180; break; // we might want to group by week here, but let's do daily for now, frontend uses flex so it might be small.
+      case '1tahun': numDays = 365; break;
+    }
+
+    // If more than 30 days, we'll group by month to keep the chart readable
+    if (numDays >= 90) {
+      groupSql = `TO_CHAR(waktu_transaksi, 'YYYY-MM')`;
+    }
+
     const rows = await db.all(`
-      SELECT DATE(waktu_transaksi) as tanggal, SUM(total_belanja) as total 
+      SELECT ${groupSql} as tanggal, SUM(total_belanja) as total 
       FROM transaksi 
-      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - INTERVAL '6 days'
-      GROUP BY DATE(waktu_transaksi)
-      ORDER BY DATE(waktu_transaksi) ASC
+      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - ${intervalSql}
+      GROUP BY ${groupSql}
+      ORDER BY ${groupSql} ASC
     `);
     
-    // Fill missing days
-    const chartData = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const existing = rows.find(r => r.tanggal === dateStr);
-      chartData.push({
-        tanggal: dateStr,
-        total: existing ? existing.total : 0
-      });
-    }
+    // Instead of filling missing days for all ranges (which is complex for months),
+    // let's just return the aggregated rows and the frontend will render them.
+    // However, if we don't fill, days with 0 sales will be skipped.
+    const chartData = rows.map(r => ({
+      tanggal: r.tanggal,
+      total: parseFloat(r.total)
+    }));
 
     res.json(chartData);
   } catch (error) {

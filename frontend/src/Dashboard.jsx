@@ -16,15 +16,16 @@ function Dashboard() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [riwayatHarga, setRiwayatHarga] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [timeFilter, setTimeFilter] = useState('bulanan');
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
         const [sumRes, bestRes, chartRes, lowRes, prodRes, expRes] = await Promise.all([
-          axios.get(`${API_URL}/dashboard/summary`),
-          axios.get(`${API_URL}/dashboard/bestsellers`),
-          axios.get(`${API_URL}/dashboard/chart`),
+          axios.get(`${API_URL}/dashboard/summary?filter=${timeFilter}`),
+          axios.get(`${API_URL}/dashboard/bestsellers?filter=${timeFilter}`),
+          axios.get(`${API_URL}/dashboard/chart?filter=${timeFilter}`),
           axios.get(`${API_URL}/dashboard/lowstock`),
           axios.get(`${API_URL}/barang`),
           axios.get(`${API_URL}/dashboard/expiring`)
@@ -44,7 +45,7 @@ function Dashboard() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [timeFilter]);
 
   const handleSelectProductCustom = async (product) => {
     setSelectedProductId(product.id);
@@ -72,7 +73,23 @@ function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%', overflowY: 'auto', paddingRight: '8px' }}>
-      <h2 style={{ margin: 0 }}>Dashboard Analitik</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <h2 style={{ margin: 0 }}>Dashboard Analitik</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <label style={{ fontWeight: 'bold', fontSize: '14px', color: 'var(--text-secondary)' }}>Periode:</label>
+          <select 
+            value={timeFilter} 
+            onChange={e => setTimeFilter(e.target.value)}
+            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--panel-border)', background: 'var(--panel-bg)', color: 'var(--text-primary)', outline: 'none' }}
+          >
+            <option value="mingguan">7 Hari Terakhir</option>
+            <option value="bulanan">30 Hari Terakhir</option>
+            <option value="3bulan">3 Bulan Terakhir</option>
+            <option value="6bulan">6 Bulan Terakhir</option>
+            <option value="1tahun">1 Tahun Terakhir</option>
+          </select>
+        </div>
+      </div>
       
       {lowStock.length > 0 && (
         <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '16px', borderRadius: '8px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -93,37 +110,48 @@ function Dashboard() {
           <h3 style={{ fontSize: '24px', color: 'var(--text-primary)' }}>Rp{summary.pendapatan_hari_ini.toLocaleString('id-ID')}</h3>
         </div>
         <div className="glass-panel" style={{ borderLeft: '4px solid var(--success)', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Keuntungan Bersih (Bulan Ini)</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--success)' }}>Rp{summary.keuntungan_bulan_ini.toLocaleString('id-ID')}</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Keuntungan Bersih (Periode Ini)</p>
+          <h3 style={{ fontSize: '24px', color: 'var(--success)' }}>Rp{(summary.keuntungan_bulan_ini || 0).toLocaleString('id-ID')}</h3>
         </div>
         <div className="glass-panel" style={{ borderLeft: '4px solid var(--danger)', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Kerugian Stok Expired (Bulan Ini)</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Kerugian Stok Expired</p>
           <h3 style={{ fontSize: '24px', color: 'var(--danger)' }}>Rp{(summary.kerugian_bulan_ini || 0).toLocaleString('id-ID')}</h3>
         </div>
         <div className="glass-panel" style={{ borderLeft: '4px solid #8b5cf6', padding: '20px' }}>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Nilai Aset Toko (Total Modal Stok)</p>
-          <h3 style={{ fontSize: '24px', color: '#8b5cf6' }}>Rp{summary.saldo_toko.toLocaleString('id-ID')}</h3>
+          <h3 style={{ fontSize: '24px', color: '#8b5cf6' }}>Rp{(summary.saldo_toko || 0).toLocaleString('id-ID')}</h3>
         </div>
         <div className="glass-panel" style={{ borderLeft: '4px solid var(--warning)', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Transaksi Bulan Ini</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)' }}>{summary.transaksi_bulan_ini} Nota</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Transaksi (Periode Ini)</p>
+          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)' }}>{(summary.transaksi_bulan_ini || 0).toLocaleString('id-ID')} Nota</h3>
         </div>
       </div>
 
       <div className="grid-2fr-1fr" style={{ display: 'grid', gap: '24px' }}>
         {/* CHART SECTION */}
-        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ marginBottom: '24px' }}>Tren Penjualan (7 Hari Terakhir)</h3>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '200px', paddingBottom: '20px', borderBottom: '1px solid var(--panel-border)' }}>
+          <h3 style={{ marginBottom: '24px' }}>Tren Penjualan ({
+            timeFilter === 'mingguan' ? '7 Hari Terakhir' : 
+            timeFilter === 'bulanan' ? '30 Hari Terakhir' : 
+            timeFilter === '3bulan' ? '3 Bulan Terakhir' : 
+            timeFilter === '6bulan' ? '6 Bulan Terakhir' : '1 Tahun Terakhir'
+          })</h3>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '200px', paddingBottom: '20px', borderBottom: '1px solid var(--panel-border)', overflowX: 'auto', gap: '4px' }}>
             {chartData.map((data, idx) => {
-              const heightPercent = (data.total / maxSales) * 100;
+              const heightPercent = maxSales > 0 ? (data.total / maxSales) * 100 : 0;
+              // Format date based on length of date string (YYYY-MM vs YYYY-MM-DD)
+              const isMonthOnly = data.tanggal.length === 7;
               const dateObj = new Date(data.tanggal);
-              const dayName = dateObj.toLocaleDateString('id-ID', { weekday: 'short' });
+              let label = '';
+              if (isMonthOnly) {
+                label = dateObj.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' });
+              } else {
+                label = timeFilter === 'mingguan' ? dateObj.toLocaleDateString('id-ID', { weekday: 'short' }) : dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+              }
               
               return (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '10%' }}>
+                <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: '30px' }}>
                   <div 
-                    title={`Rp${data.total.toLocaleString()}`}
+                    title={`Rp${data.total.toLocaleString('id-ID')} - ${data.tanggal}`}
                     style={{ 
                       width: '100%', 
                       height: `${heightPercent}%`, 
@@ -133,7 +161,7 @@ function Dashboard() {
                       transition: 'height 0.5s ease'
                     }} 
                   />
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>{dayName}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '8px', whiteSpace: 'nowrap' }}>{label}</span>
                 </div>
               );
             })}
@@ -179,7 +207,7 @@ function Dashboard() {
                       <tr key={idx}>
                         <td style={{ fontWeight: 'bold' }}>{b.nama_barang}</td>
                         <td style={{ textAlign: 'right', color: 'var(--success)', fontWeight: 'bold' }}>
-                          {b.total_terjual} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{b.satuan_pecahan}</span>
+                          {(b.total_terjual || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{b.satuan_pecahan}</span>
                         </td>
                       </tr>
                     ))
@@ -223,7 +251,7 @@ function Dashboard() {
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', color: l.total_stok === 0 ? 'var(--danger)' : 'var(--warning)', fontWeight: 'bold' }}>
-                          {l.total_stok} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{l.satuan_pecahan}</span>
+                          {(l.total_stok || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{l.satuan_pecahan}</span>
                         </td>
                       </tr>
                     ))
@@ -329,7 +357,7 @@ function Dashboard() {
                         <td>{new Date(r.tgl_masuk).toLocaleDateString('id-ID')}</td>
                         <td>{r.nama_supplier || '-'}</td>
                         <td style={{ textAlign: 'right', color: isTermurah ? '#166534' : 'inherit' }}>
-                          Rp{r.harga_beli_aktual.toLocaleString()}
+                          Rp{(r.harga_beli_aktual || 0).toLocaleString('id-ID')}
                           {isTermurah && <span style={{ marginLeft: '8px', fontSize: '11px', background: '#166534', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>Termurah</span>}
                         </td>
                       </tr>
