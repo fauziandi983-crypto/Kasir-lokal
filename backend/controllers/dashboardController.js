@@ -37,7 +37,7 @@ exports.getSummary = async (req, res) => {
 
     // 3. Keuntungan Bersih Periode
     const profitRow = await db.get(`
-      SELECT SUM((td.harga_satuan_terpakai - COALESCE(bb.harga_beli_aktual, b.harga_beli)) * td.jumlah_beli - COALESCE(td.diskon_per_item, 0)) as keuntungan
+      SELECT SUM((td.harga_satuan_terpakai - COALESCE(bb.harga_beli_aktual, b.harga_beli)) * td.jumlah_beli) as keuntungan
       FROM transaksi_detail td
       JOIN transaksi t ON td.transaksi_id = t.id
       LEFT JOIN barang_batch bb ON td.batch_id = bb.id
