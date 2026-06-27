@@ -41,7 +41,10 @@ function App() {
     const savedUser = localStorage.getItem('user');
     if (token && savedUser) {
       axios.get(`${API_URL}/auth/me`).then(res => {
-        setCurrentUser(JSON.parse(savedUser));
+        const u = JSON.parse(savedUser);
+        setCurrentUser(u);
+        if (u.role === 'superadmin') setCurrentTab('superadmin');
+        else if (u.role === 'owner') setCurrentTab('users');
       }).catch(() => {
         // Token expired or invalid
         localStorage.removeItem('token');
@@ -77,6 +80,9 @@ function App() {
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
+    if (user.role === 'superadmin') setCurrentTab('superadmin');
+    else if (user.role === 'owner') setCurrentTab('users');
+    else setCurrentTab('pos');
   };
 
   const handleLogout = () => {

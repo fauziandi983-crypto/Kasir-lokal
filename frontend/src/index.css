@@ -259,6 +259,9 @@ input:focus, select:focus {
   .printable-receipt, .printable-receipt * {
     visibility: visible;
   }
+  .printable-receipt img {
+    filter: grayscale(100%);
+  }
   .printable-receipt {
     position: absolute;
     left: 0;

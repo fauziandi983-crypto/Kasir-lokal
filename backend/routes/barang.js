@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const barangController = require('../controllers/barangController');
+const authController = require('../controllers/authController');
+
+router.use(authController.verifyToken);
 
 router.get('/', barangController.getAllBarang);
 router.get('/monitoring', barangController.getMonitoringStok);
