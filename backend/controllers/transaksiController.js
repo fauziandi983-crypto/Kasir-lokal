@@ -18,7 +18,7 @@ exports.checkout = async (req, res) => {
       if (existingPelanggan) {
         final_pelanggan_id = existingPelanggan.id;
       } else {
-        const pResult = await db.run('INSERT INTO pelanggan (nama_pelanggan, tipe_pelanggan) VALUES (?, ?)', [pelanggan_nama.trim(), is_mode_pedagang ? 'pedagang' : 'biasa']);
+        const pResult = await db.run('INSERT INTO pelanggan (nama_pelanggan, tipe_pelanggan) VALUES (?, ?) RETURNING id', [pelanggan_nama.trim(), is_mode_pedagang ? 'pedagang' : 'biasa']);
         final_pelanggan_id = pResult.lastID;
       }
     }
@@ -31,7 +31,7 @@ exports.checkout = async (req, res) => {
     // Create Transaksi Header
     const trxResult = await db.run(`
       INSERT INTO transaksi (nota_nomor, user_id, pelanggan_id, total_belanja, total_diskon, uang_bayar, uang_kembalian, is_mode_pedagang)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
     `, [nota_nomor, user_id || null, final_pelanggan_id, 0, 0, uang_bayar, 0, isModePedagangInt]);
     
     const transaksi_id = trxResult.lastID;
@@ -63,7 +63,7 @@ exports.checkout = async (req, res) => {
       const batches = await db.all(`
         SELECT * FROM barang_batch 
         WHERE barang_id = ? AND stok_batch > 0 AND COALESCE(tgl_expired, '9999-12-31') >= CURRENT_DATE
-        ORDER BY IFNULL(tgl_expired, '9999-12-31') ASC
+        ORDER BY COALESCE(tgl_expired, '9999-12-31') ASC
       `, [barang_id]);
 
       let batchIndex = 0;

@@ -139,7 +139,7 @@ exports.createBarang = async (req, res) => {
       if (existing) {
         supplier_id = existing.id;
       } else {
-        const supResult = await db.run('INSERT INTO supplier (nama_supplier) VALUES (?)', [nama_supplier.trim()]);
+        const supResult = await db.run('INSERT INTO supplier (nama_supplier) VALUES (?) RETURNING id', [nama_supplier.trim()]);
         supplier_id = supResult.lastID;
       }
     }
@@ -150,7 +150,7 @@ exports.createBarang = async (req, res) => {
         multiplier_konversi, harga_beli, harga_jual_ecer,
         harga_jual_grosir, min_beli_grosir, stok_awal_referensi,
         stok_minimum, supplier_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
     `;
     const result = await db.run(query, [
       kode_barang, nama_barang, kategori || 'Umum', satuan_utama, satuan_pecahan,
@@ -220,7 +220,7 @@ exports.createBatch = async (req, res) => {
 
     const query = `
       INSERT INTO barang_batch (barang_id, no_batch, barcode_batch, stok_batch, tgl_masuk, tgl_expired, supplier_id, harga_beli_aktual)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
     `;
     const result = await db.run(query, [
       barang_id, no_batch, barcode_batch, stok_batch, 
@@ -250,5 +250,17 @@ exports.getRiwayatHarga = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error fetching riwayat harga' });
+  }
+};
+
+exports.deleteBarang = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDB();
+    await db.run('DELETE FROM barang WHERE id = ?', [id]);
+    res.json({ message: 'Barang berhasil dihapus' });
+  } catch (error) {
+    console.error('Error deleting barang:', error);
+    res.status(500).json({ message: 'Error deleting barang' });
   }
 };

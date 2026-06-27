@@ -153,6 +153,18 @@ function Inventory() {
     }
   };
 
+  const handleDeleteBarang = async (id, nama_barang) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus barang "${nama_barang}"? Semua batch dan riwayat yang terkait juga akan terhapus.`)) {
+      try {
+        await axios.delete(`${API_URL}/barang/${id}`);
+        alert('Barang berhasil dihapus!');
+        fetchProducts();
+      } catch (err) {
+        alert('Gagal menghapus barang: ' + (err.response?.data?.message || err.message));
+      }
+    }
+  };
+
   const handleInventoryScan = (scannedText) => {
     setIsScannerOpen(false);
     if (scanTarget === 'kode_barang') {
@@ -270,6 +282,7 @@ function Inventory() {
                             <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                               <button className="btn" style={{ padding: '4px 8px', fontSize: '12px', background: '#64748b', color: 'white', border: 'none' }} onClick={() => openRiwayat(p)}>Riwayat Harga</button>
                               <button className="btn" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleEditPriceClick(p)}>Edit Harga</button>
+                              <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleDeleteBarang(p.id, p.nama_barang)}>Hapus</button>
                             </div>
                           )}
                         </td>

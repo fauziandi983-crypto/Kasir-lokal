@@ -17,7 +17,7 @@ exports.createSupplier = async (req, res) => {
     if (!nama_supplier) return res.status(400).json({ message: 'Nama supplier is required' });
 
     const db = await getDB();
-    const result = await db.run('INSERT INTO supplier (nama_supplier) VALUES (?)', [nama_supplier]);
+    const result = await db.run('INSERT INTO supplier (nama_supplier) VALUES (?) RETURNING id', [nama_supplier]);
     res.status(201).json({ id: result.lastID, message: 'Supplier created' });
   } catch (error) {
     console.error(error);

@@ -12,5 +12,6 @@ router.put('/:id/harga', barangController.updateHarga);
 router.get('/:barang_id/batches', barangController.getBatches);
 router.post('/:barang_id/batches', barangController.createBatch);
 router.get('/:id/riwayat-harga', barangController.getRiwayatHarga);
+router.delete('/:id', barangController.deleteBarang);
 
 module.exports = router;
