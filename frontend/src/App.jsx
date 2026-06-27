@@ -70,12 +70,16 @@ function App() {
     }
   }, [currentTab, currentUser]);
 
-  useEffect(() => {
+  const fetchTokoProfile = () => {
     if (currentUser && (currentUser.role === 'toko' || currentUser.role === 'kasir')) {
       axios.get(`${API_URL}/toko`)
         .then(res => setTokoProfile(res.data))
         .catch(err => console.error("Error fetching toko profile", err));
     }
+  };
+
+  useEffect(() => {
+    fetchTokoProfile();
   }, [currentUser]);
 
   const handleLoginSuccess = (user) => {
@@ -343,7 +347,7 @@ function App() {
       
       <div className="main-content">
         {currentTab === 'superadmin' && currentUser.role === 'superadmin' && <SuperAdminDashboard />}
-        {currentTab === 'toko_settings' && currentUser.role === 'toko' && <TokoSettings currentUser={currentUser} />}
+        {currentTab === 'toko_settings' && currentUser.role === 'toko' && <TokoSettings currentUser={currentUser} onProfileUpdated={fetchTokoProfile} />}
         {currentTab === 'dashboard' && <Dashboard />}
         {currentTab === 'inventory' && <Inventory />}
         {currentTab === 'monitoring' && <MonitoringStok />}

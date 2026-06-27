@@ -3,7 +3,7 @@ import axios from 'axios';
 
 const API_URL = '/api';
 
-function TokoSettings({ currentUser }) {
+function TokoSettings({ currentUser, onProfileUpdated }) {
   const [toko, setToko] = useState(null);
   const [formData, setFormData] = useState({
     nama_toko: '',
@@ -36,6 +36,7 @@ function TokoSettings({ currentUser }) {
     try {
       await axios.put(`${API_URL}/toko/${toko.id}`, formData);
       alert('Profil toko berhasil disimpan!');
+      if (onProfileUpdated) onProfileUpdated();
     } catch (err) {
       alert(err.response?.data?.message || 'Gagal menyimpan');
     }
