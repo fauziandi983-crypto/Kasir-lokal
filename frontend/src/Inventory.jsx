@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import BarcodeScanner from './components/BarcodeScanner';
+import CurrencyInput from './components/CurrencyInput';
 
 const API_URL = '/api';
 
@@ -246,11 +247,11 @@ function Inventory() {
                         {editingPriceId === p.id ? (
                           <>
                             <td>
-                              <input type="number" value={editHargaBeli} onChange={e => setEditHargaBeli(e.target.value)} style={{ width: '100px', padding: '6px' }} placeholder="Modal" />
+                              <CurrencyInput value={editHargaBeli} onChange={val => setEditHargaBeli(val)} style={{ width: '100px', padding: '6px' }} placeholder="Modal" />
                             </td>
                             <td>
-                              <input type="number" value={editHargaEcer} onChange={e => setEditHargaEcer(e.target.value)} style={{ width: '100px', padding: '6px' }} placeholder="Ecer" />
-                              <br/><input type="number" value={editHargaGrosir} onChange={e => setEditHargaGrosir(e.target.value)} style={{ width: '100px', padding: '6px', marginTop: '4px' }} placeholder="Grosir" />
+                              <CurrencyInput value={editHargaEcer} onChange={val => setEditHargaEcer(val)} style={{ width: '100px', padding: '6px' }} placeholder="Ecer" />
+                              <br/><CurrencyInput value={editHargaGrosir} onChange={val => setEditHargaGrosir(val)} style={{ width: '100px', padding: '6px', marginTop: '4px' }} placeholder="Grosir" />
                             </td>
                           </>
                         ) : (
@@ -345,17 +346,17 @@ function Inventory() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Harga Modal / Beli</label>
-              <input required type="number" step="0.01" placeholder="Rp..." value={newProduct.harga_beli} onChange={e => setNewProduct({...newProduct, harga_beli: e.target.value})} />
+              <CurrencyInput required placeholder="Rp..." value={newProduct.harga_beli} onChange={val => setNewProduct({...newProduct, harga_beli: val})} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Harga Jual Eceran</label>
-              <input required type="number" step="0.01" placeholder="Rp..." value={newProduct.harga_jual_ecer} onChange={e => setNewProduct({...newProduct, harga_jual_ecer: e.target.value})} />
+              <CurrencyInput required placeholder="Rp..." value={newProduct.harga_jual_ecer} onChange={val => setNewProduct({...newProduct, harga_jual_ecer: val})} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Harga Jual Grosir</label>
-              <input required type="number" step="0.01" placeholder="Rp..." value={newProduct.harga_jual_grosir} onChange={e => setNewProduct({...newProduct, harga_jual_grosir: e.target.value})} />
+              <CurrencyInput required placeholder="Rp..." value={newProduct.harga_jual_grosir} onChange={val => setNewProduct({...newProduct, harga_jual_grosir: val})} />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -434,7 +435,7 @@ function Inventory() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Harga Beli Aktual (Modal)</label>
-                <input required type="number" step="0.01" placeholder="Harga Beli saat ini" value={newBatch.harga_beli_aktual} onChange={e => setNewBatch({...newBatch, harga_beli_aktual: e.target.value})} />
+                <CurrencyInput required placeholder="Harga Beli saat ini" value={newBatch.harga_beli_aktual} onChange={val => setNewBatch({...newBatch, harga_beli_aktual: val})} />
               </div>
             </div>
 
