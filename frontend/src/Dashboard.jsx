@@ -208,7 +208,7 @@ function Dashboard() {
                       <tr key={idx}>
                         <td style={{ fontWeight: 'bold' }}>{b.nama_barang}</td>
                         <td style={{ textAlign: 'right', color: 'var(--success)', fontWeight: 'bold' }}>
-                          {(b.total_terjual || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{b.satuan_pecahan}</span>
+                          {parseFloat(b.total_terjual || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{b.satuan_pecahan}</span>
                         </td>
                       </tr>
                     ))
@@ -226,7 +226,7 @@ function Dashboard() {
                           <td style={{ fontWeight: 'bold' }}>
                             {e.nama_barang}
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'normal', marginTop: '2px' }}>
-                              Batch: {e.no_batch} ({e.stok_batch} {e.satuan_pecahan})
+                              Batch: {e.no_batch} ({parseFloat(e.stok_batch).toLocaleString('id-ID')} {e.satuan_pecahan})
                             </div>
                           </td>
                           <td style={{ textAlign: 'right', color: isExpired ? 'var(--danger)' : 'var(--warning)', fontWeight: 'bold' }}>
@@ -248,11 +248,11 @@ function Dashboard() {
                         <td style={{ fontWeight: 'bold' }}>
                           {l.nama_barang}
                           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 'normal', marginTop: '2px' }}>
-                            Min Stok: {l.stok_minimum} {l.satuan_pecahan}
+                            Min Stok: {parseFloat(l.stok_minimum).toLocaleString('id-ID')} {l.satuan_pecahan}
                           </div>
                         </td>
                         <td style={{ textAlign: 'right', color: l.total_stok === 0 ? 'var(--danger)' : 'var(--warning)', fontWeight: 'bold' }}>
-                          {(l.total_stok || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{l.satuan_pecahan}</span>
+                          {parseFloat(l.total_stok || 0).toLocaleString('id-ID')} <span style={{ fontSize: '11px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>{l.satuan_pecahan}</span>
                         </td>
                       </tr>
                     ))

@@ -257,18 +257,18 @@ function Inventory() {
                         ) : (
                           <>
                             <td style={{ color: 'var(--text-secondary)' }}>
-                              Rp{p.harga_beli.toLocaleString()}
+                              Rp{parseFloat(p.harga_beli).toLocaleString('id-ID')}
                             </td>
                             <td>
-                              Rp{p.harga_jual_ecer.toLocaleString()}
-                              <br/><span style={{ fontSize: '11px', color: 'var(--success)' }}>Grosir: Rp{p.harga_jual_grosir.toLocaleString()}</span>
+                              Rp{parseFloat(p.harga_jual_ecer).toLocaleString('id-ID')}
+                              <br/><span style={{ fontSize: '11px', color: 'var(--success)' }}>Grosir: Rp{parseFloat(p.harga_jual_grosir).toLocaleString('id-ID')}</span>
                             </td>
                           </>
                         )}
 
                         <td style={{ textAlign: 'right' }}>
                           <span style={{ fontWeight: 'bold', color: isLowStock ? '#ef4444' : 'var(--accent)' }}>
-                            {p.total_stok} <span style={{ fontSize: '12px', fontWeight: 'normal' }}>{p.satuan_pecahan}</span>
+                            {parseFloat(p.total_stok).toLocaleString('id-ID')} <span style={{ fontSize: '12px', fontWeight: 'normal' }}>{p.satuan_pecahan}</span>
                           </span>
                           {isLowStock && <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>⚠️ Perlu Restock</div>}
                         </td>

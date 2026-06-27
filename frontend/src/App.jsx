@@ -408,10 +408,10 @@ function App() {
                       
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
                         <p style={{ color: 'var(--accent)', fontWeight: 'bold' }}>
-                          Rp{p.harga_jual_ecer.toLocaleString()}
+                          Rp{parseFloat(p.harga_jual_ecer).toLocaleString('id-ID')}
                         </p>
                         <p style={{ fontSize: '12px', color: p.total_stok > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 'bold' }}>
-                          Stok: {p.total_stok}
+                          Stok: {parseFloat(p.total_stok).toLocaleString('id-ID')}
                         </p>
                       </div>
                     </div>
@@ -455,10 +455,10 @@ function App() {
                           
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                              @ Rp{price.toLocaleString()}
+                              @ Rp{parseFloat(price).toLocaleString('id-ID')}
                               {isGrosir && <span style={{ color: 'var(--success)', marginLeft: '4px', padding: '2px 4px', background: 'rgba(16, 185, 129, 0.2)', borderRadius: '4px' }}>Grosir</span>}
                             </p>
-                            <span style={{ fontWeight: 'bold' }}>Rp{(price * q).toLocaleString()}</span>
+                            <span style={{ fontWeight: 'bold' }}>Rp{(parseFloat(price) * q).toLocaleString('id-ID')}</span>
                           </div>
                         </div>
                       </div>
@@ -479,7 +479,7 @@ function App() {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '20px', fontWeight: 'bold' }}>
                   <span>Total Belanja:</span>
-                  <span style={{ color: 'var(--accent)' }}>Rp{totalBelanja.toLocaleString()}</span>
+                  <span style={{ color: 'var(--accent)' }}>Rp{parseFloat(totalBelanja).toLocaleString('id-ID')}</span>
                 </div>
                 
                 <div style={{ marginBottom: '16px' }}>
@@ -496,7 +496,7 @@ function App() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '16px', fontWeight: 'bold' }}>
                   <span>Kembalian:</span>
                   <span style={{ color: kembalian >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    Rp{kembalian > 0 ? kembalian.toLocaleString() : 0}
+                    Rp{kembalian > 0 ? parseFloat(kembalian).toLocaleString('id-ID') : 0}
                   </span>
                 </div>
 
