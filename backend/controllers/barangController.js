@@ -135,7 +135,7 @@ exports.createBarang = async (req, res) => {
 
     let supplier_id = null;
     if (nama_supplier && nama_supplier.trim()) {
-      const existing = await db.get('SELECT id FROM supplier WHERE nama_supplier = ? COLLATE NOCASE', [nama_supplier.trim()]);
+      const existing = await db.get('SELECT id FROM supplier WHERE nama_supplier ILIKE ?', [nama_supplier.trim()]);
       if (existing) {
         supplier_id = existing.id;
       } else {

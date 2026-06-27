@@ -14,7 +14,7 @@ exports.checkout = async (req, res) => {
 
     let final_pelanggan_id = pelanggan_id || null;
     if (pelanggan_nama && pelanggan_nama.trim() !== '') {
-      const existingPelanggan = await db.get('SELECT id FROM pelanggan WHERE nama_pelanggan = ? COLLATE NOCASE', [pelanggan_nama.trim()]);
+      const existingPelanggan = await db.get('SELECT id FROM pelanggan WHERE nama_pelanggan ILIKE ?', [pelanggan_nama.trim()]);
       if (existingPelanggan) {
         final_pelanggan_id = existingPelanggan.id;
       } else {

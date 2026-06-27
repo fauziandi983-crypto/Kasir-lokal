@@ -18,8 +18,12 @@ function BarcodeScanner({ onScan, onClose }) {
       { facingMode: "environment" },
       {
         fps: 10,
-        // Ubah bentuk area scan menjadi persegi panjang (cocok untuk barcode batang 1D)
-        qrbox: { width: 300, height: 150 },
+        // Responsive qrbox: 80% of width, up to 300px width and 150px height
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const width = Math.min(300, viewfinderWidth * 0.8);
+          const height = Math.min(150, viewfinderHeight * 0.5);
+          return { width: width, height: height };
+        },
         // disableFlip false agar bisa menangani kamera depan laptop yang biasanya seperti cermin (mirrored)
         disableFlip: false 
       },
@@ -40,6 +44,8 @@ function BarcodeScanner({ onScan, onClose }) {
       }
     }).catch(err => {
       console.error("Gagal memulai kamera:", err);
+      alert("Gagal mengakses kamera. Pastikan browser memiliki izin akses kamera atau coba muat ulang halaman.");
+      if (onClose) onClose();
     });
 
     return () => {
