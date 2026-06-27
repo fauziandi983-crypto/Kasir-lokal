@@ -1,6 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
+const authController = require('../controllers/authController');
+
+// All dashboard endpoints are owner only
+router.use(authController.verifyToken, authController.ownerOnly);
 
 router.get('/summary', dashboardController.getSummary);
 router.get('/bestsellers', dashboardController.getBestSellers);

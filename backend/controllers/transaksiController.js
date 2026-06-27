@@ -1,7 +1,8 @@
 const { getDB } = require('../db');
 
 exports.checkout = async (req, res) => {
-  const { user_id, pelanggan_id, pelanggan_nama, uang_bayar, is_mode_pedagang, items } = req.body;
+  const { pelanggan_id, pelanggan_nama, uang_bayar, is_mode_pedagang, items } = req.body;
+  const user_id = req.user.id; // Get user_id from token for security
   
   if (!items || items.length === 0) {
     return res.status(400).json({ message: 'Cart is empty' });
@@ -128,11 +129,18 @@ exports.getTransaksi = async (req, res) => {
       FROM transaksi t
       LEFT JOIN pelanggan p ON t.pelanggan_id = p.id
       LEFT JOIN users u ON t.user_id = u.id
+      WHERE 1=1
     `;
     const params = [];
     
+    // RBAC: Kasir can only see their own transactions
+    if (req.user.role === 'kasir') {
+      query += " AND t.user_id = ?";
+      params.push(req.user.id);
+    }
+    
     if (startDate && endDate) {
-      query += " WHERE date(t.waktu_transaksi) >= date(?) AND date(t.waktu_transaksi) <= date(?)";
+      query += " AND DATE(t.waktu_transaksi) >= DATE(?) AND DATE(t.waktu_transaksi) <= DATE(?)";
       params.push(startDate, endDate);
     }
     
