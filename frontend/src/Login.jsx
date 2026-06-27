@@ -4,23 +4,35 @@ import axios from 'axios';
 const API_URL = '/api';
 
 function Login({ onLoginSuccess }) {
+  const [isRegistering, setIsRegistering] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('owner');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const handleLogin = async (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccess('');
+    
     try {
-      const res = await axios.post(`${API_URL}/auth/login`, { username, password });
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
-      onLoginSuccess(res.data.user);
+      if (isRegistering) {
+        await axios.post(`${API_URL}/auth/register`, { username, password, role });
+        setSuccess('Pendaftaran berhasil! Silakan login.');
+        setIsRegistering(false);
+        setPassword('');
+      } else {
+        const res = await axios.post(`${API_URL}/auth/login`, { username, password });
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+        onLoginSuccess(res.data.user);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Gagal login. Periksa koneksi Anda.');
+      setError(err.response?.data?.message || (isRegistering ? 'Gagal mendaftar.' : 'Gagal login. Periksa koneksi Anda.'));
     } finally {
       setIsLoading(false);
     }
@@ -65,14 +77,14 @@ function Login({ onLoginSuccess }) {
             color: '#f1f5f9',
             margin: '0 0 6px'
           }}>
-            Sistem Kasir POS
+            {isRegistering ? 'Daftar Akun Baru' : 'Sistem Kasir POS'}
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
-            Silakan masuk untuk melanjutkan
+            {isRegistering ? 'Lengkapi data untuk mendaftar' : 'Silakan masuk untuk melanjutkan'}
           </p>
         </div>
 
-        {/* Error Message */}
+        {/* Error / Success Message */}
         {error && (
           <div style={{
             padding: '12px 16px',
@@ -87,9 +99,23 @@ function Login({ onLoginSuccess }) {
             ❌ {error}
           </div>
         )}
+        {success && (
+          <div style={{
+            padding: '12px 16px',
+            background: 'rgba(16, 185, 129, 0.15)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '10px',
+            color: '#10b981',
+            fontSize: '13px',
+            marginBottom: '20px',
+            textAlign: 'center'
+          }}>
+            ✅ {success}
+          </div>
+        )}
 
-        {/* Login Form */}
-        <form onSubmit={handleLogin}>
+        {/* Auth Form */}
+        <form onSubmit={handleAuth}>
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
               Username
@@ -118,7 +144,7 @@ function Login({ onLoginSuccess }) {
             />
           </div>
 
-          <div style={{ marginBottom: '28px' }}>
+          <div style={{ marginBottom: isRegistering ? '20px' : '28px' }}>
             <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
               Password
             </label>
@@ -145,6 +171,34 @@ function Login({ onLoginSuccess }) {
             />
           </div>
 
+          {isRegistering && (
+            <div style={{ marginBottom: '28px' }}>
+              <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
+                Role Akun
+              </label>
+              <select
+                value={role}
+                onChange={e => setRole(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '14px 16px',
+                  background: 'rgba(15, 23, 42, 0.6)',
+                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  borderRadius: '10px',
+                  color: '#f1f5f9',
+                  fontSize: '15px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  boxSizing: 'border-box',
+                  appearance: 'none'
+                }}
+              >
+                <option value="owner">Owner (Pemilik Toko)</option>
+                <option value="kasir">Kasir (Staf Toko)</option>
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={isLoading}
@@ -162,9 +216,29 @@ function Login({ onLoginSuccess }) {
               boxShadow: isLoading ? 'none' : '0 4px 15px rgba(16, 185, 129, 0.3)'
             }}
           >
-            {isLoading ? '⏳ Memproses...' : '🔐 Masuk'}
+            {isLoading ? '⏳ Memproses...' : (isRegistering ? '📝 Daftar' : '🔐 Masuk')}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <button 
+            onClick={() => {
+              setIsRegistering(!isRegistering);
+              setError('');
+              setSuccess('');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#38bdf8',
+              fontSize: '13px',
+              cursor: 'pointer',
+              textDecoration: 'underline'
+            }}
+          >
+            {isRegistering ? 'Sudah punya akun? Masuk di sini' : 'Belum punya akun? Daftar di sini'}
+          </button>
+        </div>
 
         <p style={{ textAlign: 'center', color: '#475569', fontSize: '12px', marginTop: '24px' }}>
           © 2026 Sistem Kasir POS
