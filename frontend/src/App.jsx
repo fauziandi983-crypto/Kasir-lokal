@@ -65,10 +65,10 @@ function App() {
   };
 
   useEffect(() => {
-    if (currentTab === 'pos') {
+    if (currentTab === 'pos' && currentUser) {
       fetchProducts();
     }
-  }, [currentTab]);
+  }, [currentTab, currentUser]);
 
   useEffect(() => {
     if (currentUser && (currentUser.role === 'toko' || currentUser.role === 'kasir')) {
@@ -90,6 +90,8 @@ function App() {
     localStorage.removeItem('user');
     delete axios.defaults.headers.common['Authorization'];
     setCurrentUser(null);
+    setProducts([]);
+    setCart([]);
     setCurrentTab('pos');
   };
 
