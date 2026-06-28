@@ -69,7 +69,7 @@ function Dashboard() {
   }
 
   // Find max for chart scaling
-  const maxSales = Math.max(...chartData.map(d => d.total), 1);
+  const maxSales = Math.max(...chartData.map(d => parseFloat(d.total) || 0), 1);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', height: '100%', overflowY: 'auto', paddingRight: '8px' }}>
@@ -138,7 +138,8 @@ function Dashboard() {
           })</h3>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '200px', paddingBottom: '20px', borderBottom: '1px solid var(--panel-border)', overflowX: 'auto', gap: '4px' }}>
             {chartData.map((data, idx) => {
-              const heightPercent = maxSales > 0 ? (data.total / maxSales) * 100 : 0;
+              const totalVal = parseFloat(data.total) || 0;
+              const heightPercent = maxSales > 0 ? (totalVal / maxSales) * 100 : 0;
               // Format date based on length of date string (YYYY-MM vs YYYY-MM-DD)
               const isMonthOnly = data.tanggal.length === 7;
               const dateObj = new Date(data.tanggal);
@@ -150,18 +151,20 @@ function Dashboard() {
               }
               
               return (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: '30px' }}>
-                  <div 
-                    title={`Rp${data.total.toLocaleString('id-ID')} - ${data.tanggal}`}
-                    style={{ 
-                      width: '100%', 
-                      height: `${heightPercent}%`, 
-                      background: 'var(--accent)', 
-                      borderRadius: '4px 4px 0 0',
-                      minHeight: data.total > 0 ? '10px' : '0',
-                      transition: 'height 0.5s ease'
-                    }} 
-                  />
+                <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, minWidth: '30px', height: '100%' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', width: '100%' }}>
+                    <div 
+                      title={`Rp${totalVal.toLocaleString('id-ID')} - ${data.tanggal}`}
+                      style={{ 
+                        width: '100%', 
+                        height: `${heightPercent}%`, 
+                        background: 'var(--accent)', 
+                        borderRadius: '4px 4px 0 0',
+                        minHeight: totalVal > 0 ? '4px' : '0',
+                        transition: 'height 0.5s ease'
+                      }} 
+                    />
+                  </div>
                   <span style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '8px', whiteSpace: 'nowrap' }}>{label}</span>
                 </div>
               );
