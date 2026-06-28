@@ -105,25 +105,25 @@ function Dashboard() {
 
       {/* SUMMARY CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--accent)', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Kas / Pendapatan Hari Ini</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)' }}>Rp{summary.pendapatan_hari_ini.toLocaleString('id-ID')}</h3>
+        <div className="glass-panel" style={{ borderLeft: '4px solid var(--accent)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Kas / Pendapatan Hari Ini</p>
+          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)', margin: 0 }}>Rp{summary.pendapatan_hari_ini.toLocaleString('id-ID')}</h3>
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--success)', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Keuntungan Bersih (Periode Ini)</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--success)' }}>Rp{(summary.keuntungan_bulan_ini || 0).toLocaleString('id-ID')}</h3>
+        <div className="glass-panel" style={{ borderLeft: '4px solid var(--success)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Keuntungan Bersih (Periode Ini)</p>
+          <h3 style={{ fontSize: '24px', color: 'var(--success)', margin: 0 }}>Rp{(summary.keuntungan_bulan_ini || 0).toLocaleString('id-ID')}</h3>
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--danger)', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Kerugian Stok Expired</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--danger)' }}>Rp{(summary.kerugian_bulan_ini || 0).toLocaleString('id-ID')}</h3>
+        <div className="glass-panel" style={{ borderLeft: '4px solid var(--danger)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Kerugian Stok Expired</p>
+          <h3 style={{ fontSize: '24px', color: 'var(--danger)', margin: 0 }}>Rp{(summary.kerugian_bulan_ini || 0).toLocaleString('id-ID')}</h3>
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid #8b5cf6', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Nilai Aset Toko (Total Modal Stok)</p>
-          <h3 style={{ fontSize: '24px', color: '#8b5cf6' }}>Rp{(summary.saldo_toko || 0).toLocaleString('id-ID')}</h3>
+        <div className="glass-panel" style={{ borderLeft: '4px solid #8b5cf6', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Nilai Aset Toko (Total Modal Stok)</p>
+          <h3 style={{ fontSize: '24px', color: '#8b5cf6', margin: 0 }}>Rp{(summary.saldo_toko || 0).toLocaleString('id-ID')}</h3>
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--warning)', padding: '20px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>Transaksi (Periode Ini)</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)' }}>{(summary.transaksi_bulan_ini || 0).toLocaleString('id-ID')} Nota</h3>
+        <div className="glass-panel" style={{ borderLeft: '4px solid var(--warning)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Transaksi (Periode Ini)</p>
+          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)', margin: 0 }}>{(summary.transaksi_bulan_ini || 0).toLocaleString('id-ID')} Nota</h3>
         </div>
       </div>
 
