@@ -116,10 +116,46 @@ input:focus, select:focus {
   gap: 16px;
   background: var(--accent);
   color: white;
+  transition: width 0.3s ease;
 }
 
-.sidebar h2 {
+.sidebar.collapsed {
+  width: 80px;
+  padding: 20px 10px;
+  align-items: center;
+}
+
+.sidebar.collapsed h2,
+.sidebar.collapsed .sidebar-footer p,
+.sidebar.collapsed .btn span,
+.sidebar.collapsed .sidebar-title {
+  display: none;
+}
+
+.sidebar.collapsed .btn {
+  padding: 10px;
+  justify-content: center !important;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sidebar-header h2 {
   color: white;
+  margin: 0;
+}
+
+.sidebar-toggle-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
 }
 
 .sidebar-menu {
@@ -253,24 +289,30 @@ input:focus, select:focus {
 
 /* Print Styles */
 @media print {
-  body * {
-    visibility: hidden;
+  body, html, .layout {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: white !important;
   }
-  .printable-receipt, .printable-receipt * {
-    visibility: visible;
+  .mobile-top-header, .sidebar, .mobile-bottom-nav, .main-content {
+    display: none !important;
   }
-  .printable-receipt img {
+  .receipt-overlay {
+    position: static !important;
+    background: transparent !important;
+    display: block !important;
+  }
+  .receipt-modal {
+    position: static !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 80mm !important; /* typical POS thermal printer width */
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .receipt-modal img {
     filter: grayscale(100%);
-  }
-  .printable-receipt {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    max-width: 80mm; /* typical POS thermal printer width */
-    margin: 0;
-    padding: 10px;
-    box-shadow: none;
   }
   .no-print {
     display: none !important;
@@ -396,7 +438,7 @@ input:focus, select:focus {
 
   .mobile-bottom-nav {
     display: flex;
-    justify-content: space-around;
+    justify-content: flex-start;
     align-items: center;
     background: white;
     height: 65px;
@@ -408,6 +450,18 @@ input:focus, select:focus {
     border-top: 1px solid var(--panel-border);
     box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
     padding-bottom: env(safe-area-inset-bottom); /* iOS support */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+  
+  /* Hide scrollbar for cleaner look */
+  .mobile-bottom-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .mobile-bottom-nav {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
   }
 
   .bottom-nav-item {
@@ -417,13 +471,14 @@ input:focus, select:focus {
     justify-content: center;
     color: var(--text-secondary);
     font-size: 10px;
-    flex: 1;
+    flex: 0 0 auto;
+    min-width: 72px;
     height: 100%;
     cursor: pointer;
     transition: color 0.2s;
     background: none;
     border: none;
-    padding: 0;
+    padding: 0 8px;
   }
 
   .bottom-nav-item.active {

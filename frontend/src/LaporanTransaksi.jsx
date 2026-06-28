@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const API_URL = '/api';
 
@@ -47,33 +49,38 @@ function LaporanTransaksi() {
     fetchTransactions(startDate, endDate);
   };
 
-  const convertToCSV = (data) => {
-    if (!data || !data.length) return '';
-    const headers = ['Nota Nomor', 'Waktu', 'Nama Pelanggan', 'Kasir', 'Total Belanja', 'Diskon', 'Uang Bayar', 'Kembalian'];
+  const downloadPDF = (data, filename) => {
+    if (!data || !data.length) return;
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(14);
+    doc.text('Laporan Transaksi KasirUKM', 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 22);
+
+    const headers = [['Waktu', 'Nota', 'Pelanggan', 'Kasir', 'Total Belanja', 'Diskon', 'Uang Bayar', 'Kembalian']];
     const rows = data.map(t => [
+      new Date(t.waktu_transaksi).toLocaleString('id-ID'),
       t.nota_nomor,
-      t.waktu_transaksi,
       t.nama_pelanggan || '-',
       t.nama_kasir || '-',
-      t.total_belanja,
-      t.total_diskon,
-      t.uang_bayar,
-      t.uang_kembalian
+      `Rp${parseFloat(t.total_belanja || 0).toLocaleString('id-ID')}`,
+      `Rp${parseFloat(t.total_diskon || 0).toLocaleString('id-ID')}`,
+      `Rp${parseFloat(t.uang_bayar || 0).toLocaleString('id-ID')}`,
+      `Rp${parseFloat(t.uang_kembalian || 0).toLocaleString('id-ID')}`
     ]);
-    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    return csvContent;
-  };
 
-  const downloadCSV = (data, filename) => {
-    const csvStr = convertToCSV(data);
-    const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    doc.autoTable({
+      startY: 28,
+      head: headers,
+      body: rows,
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [30, 58, 138] }, // var(--accent)
+    });
+
+    doc.save(filename);
   };
 
   const handleDownloadFiltered = () => {
@@ -81,7 +88,7 @@ function LaporanTransaksi() {
       alert("Tidak ada data untuk didownload.");
       return;
     }
-    downloadCSV(transactions, `Laporan_Transaksi_${startDate}_sd_${endDate}.csv`);
+    downloadPDF(transactions, `Laporan_Transaksi_${startDate}_sd_${endDate}.pdf`);
   };
 
   const handleDownload1Tahun = async () => {
@@ -97,7 +104,7 @@ function LaporanTransaksi() {
         alert("Tidak ada data dalam 1 tahun terakhir.");
         return;
       }
-      downloadCSV(data1Year, `Laporan_Transaksi_1_Tahun_${endToday}.csv`);
+      downloadPDF(data1Year, `Laporan_Transaksi_1_Tahun_${endToday}.pdf`);
     } catch (err) {
       console.error("Error fetching 1 year data", err);
       alert("Gagal memuat data laporan tahunan.");
@@ -109,7 +116,7 @@ function LaporanTransaksi() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>Laporan Transaksi</h2>
         <button className="btn btn-success" onClick={handleDownload1Tahun}>
-          📥 Download Laporan 1 Tahun (CSV)
+          📥 Download Laporan 1 Tahun (PDF)
         </button>
       </div>
 
@@ -183,9 +190,9 @@ function LaporanTransaksi() {
                       <td>{new Date(t.waktu_transaksi).toLocaleString('id-ID')}</td>
                       <td>{t.nota_nomor}</td>
                       <td>{t.nama_pelanggan || '-'}</td>
-                      <td>Rp{t.total_belanja.toLocaleString()}</td>
-                      <td>Rp{t.uang_bayar.toLocaleString()}</td>
-                      <td>Rp{t.uang_kembalian.toLocaleString()}</td>
+                      <td>Rp{parseFloat(t.total_belanja || 0).toLocaleString('id-ID')}</td>
+                      <td>Rp{parseFloat(t.uang_bayar || 0).toLocaleString('id-ID')}</td>
+                      <td>Rp{parseFloat(t.uang_kembalian || 0).toLocaleString('id-ID')}</td>
                     </tr>
                   ))
                 )}
@@ -195,7 +202,7 @@ function LaporanTransaksi() {
                   <tr>
                     <td colSpan="3" style={{ textAlign: 'right' }}>Total dari {transactions.length} Transaksi:</td>
                     <td colSpan="3" style={{ color: 'var(--accent)' }}>
-                      Rp{transactions.reduce((sum, t) => sum + t.total_belanja, 0).toLocaleString()}
+                      Rp{transactions.reduce((sum, t) => sum + parseFloat(t.total_belanja || 0), 0).toLocaleString('id-ID')}
                     </td>
                   </tr>
                 </tfoot>

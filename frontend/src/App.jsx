@@ -24,6 +24,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [currentTab, setCurrentTab] = useState('pos');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [isPedagangMode, setIsPedagangMode] = useState(false);
@@ -223,8 +224,17 @@ function App() {
       </div>
 
       {/* Desktop Sidebar */}
-      <div className="sidebar">
-        <h2>KasirUKM</h2>
+      <div className={`sidebar ${!isSidebarOpen ? 'collapsed' : ''}`}>
+        <div className="sidebar-header">
+          <h2 className="sidebar-title">KasirUKM</h2>
+          <button 
+            className="sidebar-toggle-btn" 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            {isSidebarOpen ? '◀' : '☰'}
+          </button>
+        </div>
         
         <div className="sidebar-menu">
           {currentUser.role === 'superadmin' && (
@@ -233,7 +243,7 @@ function App() {
               onClick={() => setCurrentTab('superadmin')}
               style={{ justifyContent: 'flex-start', background: currentTab === 'superadmin' ? '' : 'rgba(255,255,255,0.1)' }}
             >
-              🏢 Dashboard Pusat
+              🏢 <span>Dashboard Pusat</span>
             </button>
           )}
 
@@ -244,35 +254,35 @@ function App() {
                 onClick={() => setCurrentTab('dashboard')}
                 style={{ justifyContent: 'flex-start', background: currentTab === 'dashboard' ? '' : 'rgba(255,255,255,0.1)' }}
               >
-                📈 Dashboard Toko
+                📈 <span>Dashboard Toko</span>
               </button>
               <button 
                 className={`btn ${currentTab === 'pos' ? 'btn-success' : ''}`}
                 onClick={() => setCurrentTab('pos')}
                 style={{ justifyContent: 'flex-start', background: currentTab === 'pos' ? '' : 'rgba(255,255,255,0.1)' }}
               >
-                🛒 Transaksi Kasir
+                🛒 <span>Transaksi Kasir</span>
               </button>
               <button 
                 className={`btn ${currentTab === 'inventory' ? 'btn-success' : ''}`}
                 onClick={() => setCurrentTab('inventory')}
                 style={{ justifyContent: 'flex-start', background: currentTab === 'inventory' ? '' : 'rgba(255,255,255,0.1)' }}
               >
-                📦 Master Barang
+                📦 <span>Master Barang</span>
               </button>
               <button 
                 className={`btn ${currentTab === 'monitoring' ? 'btn-success' : ''}`}
                 onClick={() => setCurrentTab('monitoring')}
                 style={{ justifyContent: 'flex-start', background: currentTab === 'monitoring' ? '' : 'rgba(255,255,255,0.1)' }}
               >
-                📊 Monitoring Stok
+                📊 <span>Monitoring Stok</span>
               </button>
               <button 
                 className={`btn ${currentTab === 'laporan' ? 'btn-success' : ''}`}
                 onClick={() => setCurrentTab('laporan')}
                 style={{ justifyContent: 'flex-start', background: currentTab === 'laporan' ? '' : 'rgba(255,255,255,0.1)' }}
               >
-                📋 Laporan Transaksi
+                📋 <span>Laporan Transaksi</span>
               </button>
             </>
           )}
@@ -284,14 +294,14 @@ function App() {
                 onClick={() => setCurrentTab('toko_settings')}
                 style={{ justifyContent: 'flex-start', background: currentTab === 'toko_settings' ? '' : 'rgba(255,255,255,0.1)' }}
               >
-                ⚙️ Profil Toko
+                ⚙️ <span>Profil Toko</span>
               </button>
               <button 
                 className={`btn ${currentTab === 'users' ? 'btn-success' : ''}`}
                 onClick={() => setCurrentTab('users')}
                 style={{ justifyContent: 'flex-start', background: currentTab === 'users' ? '' : 'rgba(255,255,255,0.1)' }}
               >
-                👥 Kelola Kasir
+                👥 <span>Kelola Kasir</span>
               </button>
             </>
           )}
@@ -302,12 +312,12 @@ function App() {
               onClick={() => setCurrentTab('users')}
               style={{ justifyContent: 'flex-start', background: currentTab === 'users' ? '' : 'rgba(255,255,255,0.1)' }}
             >
-              👥 Kelola Klien
+              👥 <span>Kelola Klien</span>
             </button>
           )}
         </div>
 
-        <div className="sidebar-footer">
+        <div className="sidebar-footer" style={{ marginTop: 'auto' }}>
           <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '8px' }}>
             {currentUser.role === 'owner' ? '👑' : '🧑‍💻'} {currentUser.username} ({currentUser.role})
           </p>
@@ -316,31 +326,53 @@ function App() {
             style={{ width: '100%', padding: '8px', fontSize: '13px' }}
             onClick={handleLogout}
           >
-            🚪 Logout
+            🚪 <span>Logout</span>
           </button>
         </div>
       </div>
 
       {/* Mobile Bottom Navigation */}
       <div className="mobile-bottom-nav">
-        <button className={`bottom-nav-item ${currentTab === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentTab('dashboard')}>
-          <span>📈</span>Dashboard
-        </button>
-        <button className={`bottom-nav-item ${currentTab === 'pos' ? 'active' : ''}`} onClick={() => setCurrentTab('pos')}>
-          <span>🛒</span>Kasir
-        </button>
-        <button className={`bottom-nav-item ${currentTab === 'inventory' ? 'active' : ''}`} onClick={() => setCurrentTab('inventory')}>
-          <span>📦</span>Barang
-        </button>
-        <button className={`bottom-nav-item ${currentTab === 'monitoring' ? 'active' : ''}`} onClick={() => setCurrentTab('monitoring')}>
-          <span>📊</span>Stok
-        </button>
-        <button className={`bottom-nav-item ${currentTab === 'laporan' ? 'active' : ''}`} onClick={() => setCurrentTab('laporan')}>
-          <span>📋</span>Laporan
-        </button>
+        {currentUser.role === 'superadmin' && (
+          <button className={`bottom-nav-item ${currentTab === 'superadmin' ? 'active' : ''}`} onClick={() => setCurrentTab('superadmin')}>
+            <span>🏢</span>Pusat
+          </button>
+        )}
+
+        {currentUser.role !== 'owner' && currentUser.role !== 'superadmin' && (
+          <>
+            <button className={`bottom-nav-item ${currentTab === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentTab('dashboard')}>
+              <span>📈</span>Dashboard
+            </button>
+            <button className={`bottom-nav-item ${currentTab === 'pos' ? 'active' : ''}`} onClick={() => setCurrentTab('pos')}>
+              <span>🛒</span>Kasir
+            </button>
+            <button className={`bottom-nav-item ${currentTab === 'inventory' ? 'active' : ''}`} onClick={() => setCurrentTab('inventory')}>
+              <span>📦</span>Barang
+            </button>
+            <button className={`bottom-nav-item ${currentTab === 'monitoring' ? 'active' : ''}`} onClick={() => setCurrentTab('monitoring')}>
+              <span>📊</span>Stok
+            </button>
+            <button className={`bottom-nav-item ${currentTab === 'laporan' ? 'active' : ''}`} onClick={() => setCurrentTab('laporan')}>
+              <span>📋</span>Laporan
+            </button>
+          </>
+        )}
+
+        {currentUser.role === 'toko' && (
+          <>
+            <button className={`bottom-nav-item ${currentTab === 'toko_settings' ? 'active' : ''}`} onClick={() => setCurrentTab('toko_settings')}>
+              <span>⚙️</span>Profil
+            </button>
+            <button className={`bottom-nav-item ${currentTab === 'users' ? 'active' : ''}`} onClick={() => setCurrentTab('users')}>
+              <span>👥</span>Kasir
+            </button>
+          </>
+        )}
+
         {currentUser.role === 'owner' && (
           <button className={`bottom-nav-item ${currentTab === 'users' ? 'active' : ''}`} onClick={() => setCurrentTab('users')}>
-            <span>👥</span>Users
+            <span>👥</span>Klien
           </button>
         )}
       </div>
