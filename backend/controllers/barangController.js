@@ -1,4 +1,5 @@
 const { getDB } = require('../db');
+const { logActivity } = require('../utils/logger');
 
 exports.getAllBarang = async (req, res) => {
   try {
@@ -15,10 +16,11 @@ exports.getAllBarang = async (req, res) => {
     }
 
     const rows = await db.all(`
-      SELECT b.*, COALESCE(SUM(bb.stok_batch), 0) AS total_stok, s.nama_supplier 
+      SELECT b.*, COALESCE(SUM(bb.stok_batch), 0) AS total_stok, s.nama_supplier, STRING_AGG(DISTINCT bc.barcode, ',') as barcodes
       FROM barang b 
       LEFT JOIN barang_batch bb ON b.id = bb.barang_id AND bb.stok_batch > 0 AND bb.tgl_expired >= CURRENT_DATE
       LEFT JOIN supplier s ON b.supplier_id = s.id
+      LEFT JOIN barang_barcodes bc ON b.id = bc.barang_id
       ${condition}
       GROUP BY b.id, s.nama_supplier
       ORDER BY b.nama_barang ASC
@@ -107,6 +109,8 @@ exports.buangExpired = async (req, res) => {
     
     await db.run("UPDATE barang_batch SET stok_batch = 0 WHERE tgl_expired < CURRENT_DATE AND stok_batch > 0");
     await db.run('COMMIT');
+    
+    await logActivity(req, 'BUANG_EXPIRED', `Membuang ${totalTerbuang} stok kedaluwarsa dengan total kerugian Rp${totalKerugian || 0}`);
     
     res.json({ message: `Berhasil mengeluarkan ${totalTerbuang} item barang kedaluwarsa dan mencatat kerugian.` });
   } catch (error) {
@@ -217,7 +221,13 @@ exports.createBarang = async (req, res) => {
       stok_minimum || 0, supplier_id, req.user.business_id, req_toko_id
     ]);
 
+    // Insert into barang_barcodes table too
+    if (kode_barang) {
+      await db.run('INSERT INTO barang_barcodes (barang_id, barcode) VALUES (?, ?)', [result.lastID, kode_barang]);
+    }
+
     await db.run('COMMIT');
+    await logActivity(req, 'CREATE_BARANG', `Menambahkan barang baru: ${nama_barang} (${kode_barang})`);
     res.status(201).json({ id: result.lastID, message: 'Barang created' });
   } catch (error) {
     if (db) await db.run('ROLLBACK');
@@ -246,10 +256,56 @@ exports.updateHarga = async (req, res) => {
       [harga_beli, harga_jual_ecer, harga_jual_grosir, id]
     );
 
+    await logActivity(req, 'UPDATE_HARGA', `Mengubah harga untuk barang ID: ${id}`);
     res.json({ message: 'Harga berhasil diupdate' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error updating harga' });
+  }
+};
+
+exports.updateMaster = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      kode_barang, nama_barang, kategori, satuan_utama, satuan_pecahan,
+      multiplier_konversi, stok_minimum, harga_beli, harga_jual_ecer, harga_jual_grosir
+    } = req.body;
+
+    const db = await getDB();
+    
+    // Authorization check
+    if (req.user.role !== 'owner') {
+      const b = await db.get('SELECT business_id, toko_id FROM barang WHERE id = ?', [id]);
+      if (!b) return res.status(404).json({ message: 'Barang tidak ditemukan' });
+      if (req.user.role === 'superadmin' && b.business_id !== req.user.business_id) return res.status(403).json({ message: 'Akses ditolak' });
+      if ((req.user.role === 'toko' || req.user.role === 'kasir') && b.toko_id !== req.user.toko_id) return res.status(403).json({ message: 'Akses ditolak' });
+    }
+
+    await db.run(
+      `UPDATE barang SET 
+        kode_barang = ?, nama_barang = ?, kategori = ?, satuan_utama = ?, satuan_pecahan = ?,
+        multiplier_konversi = ?, stok_minimum = ?, harga_beli = ?, harga_jual_ecer = ?, harga_jual_grosir = ? 
+      WHERE id = ?`,
+      [
+        kode_barang, nama_barang, kategori || 'Umum', satuan_utama, satuan_pecahan,
+        multiplier_konversi, stok_minimum || 0, harga_beli, harga_jual_ecer, harga_jual_grosir, id
+      ]
+    );
+
+    // Ensure the new kode_barang is in barang_barcodes
+    if (kode_barang) {
+      const exists = await db.get('SELECT id FROM barang_barcodes WHERE barang_id = ? AND barcode = ?', [id, kode_barang]);
+      if (!exists) {
+        await db.run('INSERT INTO barang_barcodes (barang_id, barcode) VALUES (?, ?)', [id, kode_barang]);
+      }
+    }
+
+    await logActivity(req, 'UPDATE_MASTER_BARANG', `Mengubah master data untuk barang ID: ${id}`);
+    res.json({ message: 'Master data barang berhasil diupdate' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error updating master barang' });
   }
 };
 
@@ -268,7 +324,7 @@ exports.getBatches = async (req, res) => {
 exports.createBatch = async (req, res) => {
   try {
     const { barang_id } = req.params;
-    const { barcode_batch, stok_batch, tgl_masuk, tgl_expired, supplier_id, harga_beli_aktual } = req.body;
+    const { barcode_batch, stok_batch, tgl_masuk, tgl_expired, supplier_id, harga_beli_aktual, harga_jual_ecer, harga_jual_grosir } = req.body;
 
     const db = await getDB();
     
@@ -295,6 +351,19 @@ exports.createBatch = async (req, res) => {
       tgl_expired, supplier_id || null, harga_beli_aktual || null
     ]);
 
+    // Update Master Barang Prices if provided
+    const updates = [];
+    const values = [];
+    if (harga_beli_aktual !== undefined && harga_beli_aktual !== null && harga_beli_aktual !== '') { updates.push('harga_beli = ?'); values.push(harga_beli_aktual); }
+    if (harga_jual_ecer !== undefined && harga_jual_ecer !== null && harga_jual_ecer !== '') { updates.push('harga_jual_ecer = ?'); values.push(harga_jual_ecer); }
+    if (harga_jual_grosir !== undefined && harga_jual_grosir !== null && harga_jual_grosir !== '') { updates.push('harga_jual_grosir = ?'); values.push(harga_jual_grosir); }
+    
+    if (updates.length > 0) {
+      values.push(barang_id);
+      await db.run(`UPDATE barang SET ${updates.join(', ')} WHERE id = ?`, values);
+    }
+
+    await logActivity(req, 'ADD_STOK', `Menambahkan stok batch sejumlah ${stok_batch} untuk barang ID: ${barang_id}`);
     res.status(201).json({ id: result.lastID, message: 'Batch created' });
   } catch (error) {
     console.error(error);
@@ -334,9 +403,47 @@ exports.deleteBarang = async (req, res) => {
     }
 
     await db.run('DELETE FROM barang WHERE id = ?', [id]);
+    await logActivity(req, 'DELETE_BARANG', `Menghapus barang ID: ${id}`);
     res.json({ message: 'Barang berhasil dihapus' });
   } catch (error) {
     console.error('Error deleting barang:', error);
     res.status(500).json({ message: 'Error deleting barang' });
+  }
+};
+
+exports.addBarcode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { barcode } = req.body;
+
+    if (!barcode) {
+      return res.status(400).json({ message: 'Barcode harus diisi' });
+    }
+
+    const db = await getDB();
+    
+    // Authorization check
+    const b = await db.get('SELECT business_id, toko_id, nama_barang FROM barang WHERE id = ?', [id]);
+    if (!b) return res.status(404).json({ message: 'Barang tidak ditemukan' });
+    if (req.user.role === 'superadmin' && b.business_id !== req.user.business_id) return res.status(403).json({ message: 'Akses ditolak' });
+    if ((req.user.role === 'toko' || req.user.role === 'kasir') && b.toko_id !== req.user.toko_id) return res.status(403).json({ message: 'Akses ditolak' });
+
+    // Check if barcode already exists
+    const exists = await db.get('SELECT id FROM barang_barcodes WHERE barang_id = ? AND barcode = ?', [id, barcode]);
+    if (exists) {
+      return res.status(400).json({ message: 'Barcode ini sudah terdaftar untuk barang tersebut' });
+    }
+
+    await db.run('INSERT INTO barang_barcodes (barang_id, barcode) VALUES (?, ?)', [id, barcode]);
+    await logActivity(req, 'ADD_BARCODE', `Menambahkan barcode ${barcode} ke barang: ${b.nama_barang}`);
+    
+    res.json({ message: 'Barcode berhasil ditambahkan' });
+  } catch (error) {
+    console.error('Error adding barcode:', error);
+    // Unique constraint violation error code in Postgres is usually 23505
+    if (error.code === '23505') {
+       return res.status(400).json({ message: 'Barcode ini sudah terdaftar.' });
+    }
+    res.status(500).json({ message: 'Gagal menambahkan barcode' });
   }
 };

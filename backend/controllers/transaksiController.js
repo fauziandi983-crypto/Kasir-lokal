@@ -1,11 +1,16 @@
 const { getDB } = require('../db');
+const { logActivity } = require('../utils/logger');
 
 exports.checkout = async (req, res) => {
-  const { pelanggan_id, pelanggan_nama, uang_bayar, is_mode_pedagang, items } = req.body;
+  const { pelanggan_id, pelanggan_nama, uang_bayar, is_mode_pedagang, items, is_hutang, catatan_hutang, tgl_jatuh_tempo } = req.body;
   const user_id = req.user.id; // Get user_id from token for security
   
   if (!items || items.length === 0) {
     return res.status(400).json({ message: 'Cart is empty' });
+  }
+
+  if (is_hutang && (!pelanggan_nama || pelanggan_nama.trim() === '')) {
+    return res.status(400).json({ message: 'Nama Pelanggan wajib diisi untuk transaksi Kasbon/Hutang' });
   }
 
   const db = await getDB();
@@ -101,17 +106,28 @@ exports.checkout = async (req, res) => {
     }
 
     const uang_kembalian = uang_bayar - total_belanja;
-    if (uang_kembalian < 0) {
-      throw new Error(`Uang bayar tidak cukup. Kurang ${Math.abs(uang_kembalian)}`);
+    let sisa_tagihan = 0;
+    let status_pembayaran = 'LUNAS';
+    let uang_kembalian_final = uang_kembalian;
+
+    if (is_hutang || uang_kembalian < 0) {
+      if (!final_pelanggan_id) throw new Error("Nama Pelanggan wajib diisi untuk Kasbon");
+      sisa_tagihan = total_belanja - (uang_bayar || 0);
+      if (sisa_tagihan < 0) sisa_tagihan = 0; // Prevent negative debt
+      status_pembayaran = 'HUTANG';
+      uang_kembalian_final = 0;
     }
 
     // Update Transaksi Header Totals
     await db.run(`
-      UPDATE transaksi SET total_belanja = ?, total_diskon = ?, uang_kembalian = ? WHERE id = ?
-    `, [total_belanja, total_diskon, uang_kembalian, transaksi_id]);
+      UPDATE transaksi SET total_belanja = ?, total_diskon = ?, uang_kembalian = ?, sisa_tagihan = ?, status_pembayaran = ?, catatan_hutang = ?, tgl_jatuh_tempo = ? WHERE id = ?
+    `, [total_belanja, total_diskon, uang_kembalian_final, sisa_tagihan, status_pembayaran, catatan_hutang || null, tgl_jatuh_tempo || null, transaksi_id]);
 
     await db.run('COMMIT');
-    res.json({ message: 'Checkout successful', transaksi_id, nota_nomor, total_belanja, uang_kembalian });
+    
+    await logActivity(req, 'TRANSAKSI', `Checkout transaksi ${nota_nomor} sejumlah Rp${total_belanja} (${status_pembayaran})`);
+    
+    res.json({ message: 'Checkout successful', transaksi_id, nota_nomor, total_belanja, uang_kembalian: uang_kembalian_final, status_pembayaran, sisa_tagihan });
   } catch (error) {
     await db.run('ROLLBACK');
     console.error('Checkout Error:', error);
@@ -157,5 +173,86 @@ exports.getTransaksi = async (req, res) => {
   } catch (error) {
     console.error('Get Transaksi Error:', error);
     res.status(500).json({ message: 'Failed to fetch transactions' });
+  }
+};
+
+exports.getHutang = async (req, res) => {
+  const db = await getDB();
+  try {
+    let query = `
+      SELECT t.*, p.nama_pelanggan, p.no_telepon as no_hp 
+      FROM transaksi t
+      JOIN pelanggan p ON t.pelanggan_id = p.id
+      WHERE t.status_pembayaran = 'HUTANG' AND t.sisa_tagihan > 0
+    `;
+    const params = [];
+    
+    if (req.user.role === 'superadmin') {
+      query += " AND t.business_id = ?";
+      params.push(req.user.business_id);
+    } else if (req.user.role === 'toko' || req.user.role === 'kasir') {
+      query += " AND t.toko_id = ?";
+      params.push(req.user.toko_id);
+    }
+    
+    query += " ORDER BY t.waktu_transaksi DESC";
+    
+    const hutangList = await db.all(query, params);
+    res.json(hutangList);
+  } catch (error) {
+    console.error('Get Hutang Error:', error);
+    res.status(500).json({ message: 'Failed to fetch hutang' });
+  }
+};
+
+exports.bayarCicilan = async (req, res) => {
+  const { id } = req.params;
+  const { jumlah_bayar } = req.body;
+  const db = await getDB();
+  
+  if (!jumlah_bayar || jumlah_bayar <= 0) {
+    return res.status(400).json({ message: 'Jumlah bayar tidak valid' });
+  }
+
+  try {
+    await db.run('BEGIN TRANSACTION');
+    
+    const trx = await db.get('SELECT * FROM transaksi WHERE id = ?', [id]);
+    if (!trx) throw new Error('Transaksi tidak ditemukan');
+    
+    if (trx.status_pembayaran !== 'HUTANG' || trx.sisa_tagihan <= 0) {
+      throw new Error('Transaksi ini sudah lunas atau bukan hutang');
+    }
+    
+    if (jumlah_bayar > trx.sisa_tagihan) {
+      throw new Error(`Uang pembayaran (Rp${jumlah_bayar}) melebihi sisa tagihan (Rp${trx.sisa_tagihan}). Harap masukkan jumlah yang pas.`);
+    }
+
+    let new_sisa = trx.sisa_tagihan - jumlah_bayar;
+    let new_status = 'HUTANG';
+    if (new_sisa <= 0) {
+      new_sisa = 0;
+      new_status = 'LUNAS';
+    }
+
+    // Insert riwayat
+    await db.run(`
+      INSERT INTO pembayaran_hutang (transaksi_id, jumlah_bayar, tgl_bayar, kasir_id, toko_id)
+      VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)
+    `, [id, jumlah_bayar, req.user.id, req.user.toko_id]);
+
+    // Update transaksi
+    await db.run(`
+      UPDATE transaksi SET sisa_tagihan = ?, status_pembayaran = ? WHERE id = ?
+    `, [new_sisa, new_status, id]);
+
+    await db.run('COMMIT');
+    await logActivity(req, 'BAYAR_HUTANG', `Pembayaran cicilan Rp${jumlah_bayar} untuk nota ${trx.nota_nomor}`);
+    
+    res.json({ message: 'Pembayaran cicilan berhasil disimpan', new_sisa, new_status });
+  } catch (error) {
+    await db.run('ROLLBACK');
+    console.error('Bayar Cicilan Error:', error);
+    res.status(400).json({ message: error.message || 'Gagal menyimpan cicilan' });
   }
 };

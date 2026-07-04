@@ -92,10 +92,10 @@ function Dashboard() {
       </div>
       
       {lowStock.length > 0 && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '16px', borderRadius: '8px', color: '#b91c1c', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '24px' }}>⚠️</span>
+        <div style={{ background: '#fffbeb', border: '1px solid #fde047', padding: '16px', borderRadius: '12px', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+          <div style={{ background: '#fef08a', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>⚠️</div>
           <div>
-            <h4 style={{ margin: 0, fontSize: '16px' }}>Peringatan Stok Menipis!</h4>
+            <h4 style={{ margin: 0, fontSize: '16px', color: '#713f12' }}>Peringatan Stok Menipis</h4>
             <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>
               Terdapat <strong>{lowStock.length}</strong> jenis barang yang stoknya sudah di bawah batas minimum. Silakan periksa halaman Monitoring Stok.
             </p>
@@ -104,26 +104,50 @@ function Dashboard() {
       )}
 
       {/* SUMMARY CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--accent)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Kas / Pendapatan Hari Ini</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)', margin: 0 }}>Rp{summary.pendapatan_hari_ini.toLocaleString('id-ID')}</h3>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '4px solid var(--accent)' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Omset Hari Ini</p>
+          <h3 style={{ fontSize: '28px', color: 'var(--text-primary)', margin: 0, fontWeight: '800' }}>Rp{(summary.pendapatan_hari_ini || 0).toLocaleString('id-ID')}</h3>
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--success)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Keuntungan Bersih (Periode Ini)</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--success)', margin: 0 }}>Rp{(summary.keuntungan_bulan_ini || 0).toLocaleString('id-ID')}</h3>
+
+        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '4px solid var(--success)' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uang di Laci (Kas Masuk)</p>
+          <h3 style={{ fontSize: '28px', color: 'var(--success)', margin: 0, fontWeight: '800' }}>Rp{(summary.kas_masuk_bulan_ini || 0).toLocaleString('id-ID')}</h3>
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--danger)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Kerugian Stok Expired</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--danger)', margin: 0 }}>Rp{(summary.kerugian_bulan_ini || 0).toLocaleString('id-ID')}</h3>
+
+        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '4px solid var(--danger)' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Piutang Berjalan</p>
+          <h3 style={{ fontSize: '28px', color: 'var(--danger)', margin: 0, fontWeight: '800' }}>Rp{(summary.total_piutang || 0).toLocaleString('id-ID')}</h3>
+          {summary.total_piutang_jatuh_tempo > 0 && (
+            <div style={{ marginTop: '8px', padding: '6px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', color: '#b91c1c', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong>⚠️ Risiko Macet (Lewat Waktu):</strong>
+              <span style={{ fontWeight: 'bold' }}>Rp{(summary.total_piutang_jatuh_tempo || 0).toLocaleString('id-ID')}</span>
+            </div>
+          )}
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid #8b5cf6', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Nilai Aset Toko (Total Modal Stok)</p>
-          <h3 style={{ fontSize: '24px', color: '#8b5cf6', margin: 0 }}>Rp{(summary.saldo_toko || 0).toLocaleString('id-ID')}</h3>
+
+        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '4px solid #f59e0b' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Keuntungan Bersih</p>
+            <span style={{ fontSize: '12px', background: '#fef3c7', color: '#d97706', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>Periode Ini</span>
+          </div>
+          <h3 style={{ fontSize: '28px', color: '#f59e0b', margin: 0, fontWeight: '800' }}>Rp{(summary.keuntungan_bulan_ini || 0).toLocaleString('id-ID')}</h3>
+          
+          <div style={{ marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--panel-border)', fontSize: '13px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Kas Riil (Di Tangan)</span>
+              <strong style={{ color: 'var(--success)' }}>Rp{(summary.keuntungan_di_tangan || 0).toLocaleString('id-ID')}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Piutang (Mengendap)</span>
+              <strong style={{ color: 'var(--warning)' }}>Rp{(summary.keuntungan_mengendap || 0).toLocaleString('id-ID')}</strong>
+            </div>
+          </div>
         </div>
-        <div className="glass-panel" style={{ borderLeft: '4px solid var(--warning)', padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '12px' }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>Transaksi (Periode Ini)</p>
-          <h3 style={{ fontSize: '24px', color: 'var(--text-primary)', margin: 0 }}>{(summary.transaksi_bulan_ini || 0).toLocaleString('id-ID')} Nota</h3>
+
+        <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '4px solid #8b5cf6' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nilai Aset Stok</p>
+          <h3 style={{ fontSize: '28px', color: '#8b5cf6', margin: 0, fontWeight: '800' }}>Rp{(summary.saldo_toko || 0).toLocaleString('id-ID')}</h3>
         </div>
       </div>
 

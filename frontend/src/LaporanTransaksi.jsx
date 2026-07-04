@@ -59,16 +59,17 @@ function LaporanTransaksi() {
     doc.setFontSize(10);
     doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 22);
 
-    const headers = [['Waktu', 'Nota', 'Pelanggan', 'Kasir', 'Total Belanja', 'Diskon', 'Uang Bayar', 'Kembalian']];
+    const headers = [['Waktu', 'Nota', 'Pelanggan', 'Kasir', 'Total Belanja', 'Uang Bayar', 'Kembalian', 'Status', 'Sisa Tagihan']];
     const rows = data.map(t => [
       new Date(t.waktu_transaksi).toLocaleString('id-ID'),
       t.nota_nomor,
       t.nama_pelanggan || '-',
       t.nama_kasir || '-',
       `Rp${parseFloat(t.total_belanja || 0).toLocaleString('id-ID')}`,
-      `Rp${parseFloat(t.total_diskon || 0).toLocaleString('id-ID')}`,
       `Rp${parseFloat(t.uang_bayar || 0).toLocaleString('id-ID')}`,
-      `Rp${parseFloat(t.uang_kembalian || 0).toLocaleString('id-ID')}`
+      `Rp${parseFloat(t.uang_kembalian || 0).toLocaleString('id-ID')}`,
+      t.status_pembayaran || 'LUNAS',
+      `Rp${parseFloat(t.sisa_tagihan || 0).toLocaleString('id-ID')}`
     ]);
 
     doc.autoTable({
@@ -176,13 +177,14 @@ function LaporanTransaksi() {
                   <th>Pelanggan</th>
                   <th>Total Belanja</th>
                   <th>Uang Bayar</th>
-                  <th>Kembalian</th>
+                  <th>Status</th>
+                  <th>Sisa Tagihan</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center' }}>Tidak ada transaksi.</td>
+                    <td colSpan="7" style={{ textAlign: 'center' }}>Tidak ada transaksi.</td>
                   </tr>
                 ) : (
                   transactions.map(t => (
@@ -192,7 +194,12 @@ function LaporanTransaksi() {
                       <td>{t.nama_pelanggan || '-'}</td>
                       <td>Rp{parseFloat(t.total_belanja || 0).toLocaleString('id-ID')}</td>
                       <td>Rp{parseFloat(t.uang_bayar || 0).toLocaleString('id-ID')}</td>
-                      <td>Rp{parseFloat(t.uang_kembalian || 0).toLocaleString('id-ID')}</td>
+                      <td style={{ fontWeight: 'bold', color: t.status_pembayaran === 'HUTANG' ? 'var(--danger)' : 'var(--success)' }}>
+                        {t.status_pembayaran || 'LUNAS'}
+                      </td>
+                      <td style={{ color: t.sisa_tagihan > 0 ? 'var(--danger)' : 'inherit' }}>
+                        Rp{parseFloat(t.sisa_tagihan || 0).toLocaleString('id-ID')}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -201,8 +208,14 @@ function LaporanTransaksi() {
                 <tfoot style={{ background: '#f8fafc', fontWeight: 'bold' }}>
                   <tr>
                     <td colSpan="3" style={{ textAlign: 'right' }}>Total dari {transactions.length} Transaksi:</td>
-                    <td colSpan="3" style={{ color: 'var(--accent)' }}>
+                    <td style={{ color: 'var(--accent)' }}>
                       Rp{transactions.reduce((sum, t) => sum + parseFloat(t.total_belanja || 0), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td>
+                      Rp{transactions.reduce((sum, t) => sum + parseFloat(t.uang_bayar || 0), 0).toLocaleString('id-ID')}
+                    </td>
+                    <td colSpan="2" style={{ color: 'var(--danger)', textAlign: 'right' }}>
+                      Piutang: Rp{transactions.reduce((sum, t) => sum + parseFloat(t.sisa_tagihan || 0), 0).toLocaleString('id-ID')}
                     </td>
                   </tr>
                 </tfoot>
