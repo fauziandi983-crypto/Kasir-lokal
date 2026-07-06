@@ -1,6 +1,7 @@
 const { getDB } = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { logActivity } = require('../utils/logger');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretposkey2026';
 
@@ -60,6 +61,10 @@ exports.login = async (req, res) => {
       toko_id: user.toko_id
     };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1d' });
+    
+    // Log activity (mock req.user)
+    await logActivity({ user: payload }, 'LOGIN', `User ${username} berhasil login`);
+
     res.json({ token, user: payload });
 
   } catch (error) {
@@ -151,6 +156,7 @@ exports.register = async (req, res) => {
       return res.status(403).json({ message: 'Anda tidak memiliki akses' });
     }
 
+    await logActivity(req, 'CREATE_USER', `Membuat akun baru: ${username} (Role: ${role})`);
     res.status(201).json({ message: 'User berhasil dibuat' });
   } catch (error) {
     console.error('Register error:', error);
@@ -192,6 +198,7 @@ exports.deleteUser = async (req, res) => {
     if (req.user.role === 'toko' && targetUser.toko_id !== req.user.toko_id) return res.status(403).json({ message: 'Akses ditolak' });
 
     await db.run('DELETE FROM users WHERE id = ?', [id]);
+    await logActivity(req, 'DELETE_USER', `Menghapus akun dengan username: ${targetUser.username}`);
     res.json({ message: 'User berhasil dihapus' });
   } catch (error) {
     console.error('Delete user error:', error);

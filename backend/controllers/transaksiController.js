@@ -1,4 +1,5 @@
 const { getDB } = require('../db');
+const { logActivity } = require('../utils/logger');
 
 exports.checkout = async (req, res) => {
   const { pelanggan_id, pelanggan_nama, uang_bayar, is_mode_pedagang, items } = req.body;
@@ -111,6 +112,9 @@ exports.checkout = async (req, res) => {
     `, [total_belanja, total_diskon, uang_kembalian, transaksi_id]);
 
     await db.run('COMMIT');
+    
+    await logActivity(req, 'TRANSAKSI', `Checkout transaksi ${nota_nomor} sejumlah Rp${total_belanja}`);
+    
     res.json({ message: 'Checkout successful', transaksi_id, nota_nomor, total_belanja, uang_kembalian });
   } catch (error) {
     await db.run('ROLLBACK');

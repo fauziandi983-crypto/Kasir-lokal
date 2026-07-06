@@ -1,4 +1,5 @@
 const { getDB } = require('../db');
+const { logActivity } = require('../utils/logger');
 
 exports.getAllBarang = async (req, res) => {
   try {
@@ -107,6 +108,8 @@ exports.buangExpired = async (req, res) => {
     
     await db.run("UPDATE barang_batch SET stok_batch = 0 WHERE tgl_expired < CURRENT_DATE AND stok_batch > 0");
     await db.run('COMMIT');
+    
+    await logActivity(req, 'BUANG_EXPIRED', `Membuang ${totalTerbuang} stok kedaluwarsa dengan total kerugian Rp${totalKerugian || 0}`);
     
     res.json({ message: `Berhasil mengeluarkan ${totalTerbuang} item barang kedaluwarsa dan mencatat kerugian.` });
   } catch (error) {
@@ -218,6 +221,7 @@ exports.createBarang = async (req, res) => {
     ]);
 
     await db.run('COMMIT');
+    await logActivity(req, 'CREATE_BARANG', `Menambahkan barang baru: ${nama_barang} (${kode_barang})`);
     res.status(201).json({ id: result.lastID, message: 'Barang created' });
   } catch (error) {
     if (db) await db.run('ROLLBACK');
@@ -246,6 +250,7 @@ exports.updateHarga = async (req, res) => {
       [harga_beli, harga_jual_ecer, harga_jual_grosir, id]
     );
 
+    await logActivity(req, 'UPDATE_HARGA', `Mengubah harga untuk barang ID: ${id}`);
     res.json({ message: 'Harga berhasil diupdate' });
   } catch (error) {
     console.error(error);
@@ -295,6 +300,7 @@ exports.createBatch = async (req, res) => {
       tgl_expired, supplier_id || null, harga_beli_aktual || null
     ]);
 
+    await logActivity(req, 'ADD_STOK', `Menambahkan stok batch sejumlah ${stok_batch} untuk barang ID: ${barang_id}`);
     res.status(201).json({ id: result.lastID, message: 'Batch created' });
   } catch (error) {
     console.error(error);
@@ -334,6 +340,7 @@ exports.deleteBarang = async (req, res) => {
     }
 
     await db.run('DELETE FROM barang WHERE id = ?', [id]);
+    await logActivity(req, 'DELETE_BARANG', `Menghapus barang ID: ${id}`);
     res.json({ message: 'Barang berhasil dihapus' });
   } catch (error) {
     console.error('Error deleting barang:', error);

@@ -250,3 +250,85 @@ exports.getExpiringItems = async (req, res) => {
     res.status(500).json({ message: 'Error fetching expiring items' });
   }
 };
+
+exports.getActivityLogs = async (req, res) => {
+  try {
+    const db = await getDB();
+    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+    
+    let condition = 'a.business_id = ?';
+    let params = [req.user.business_id];
+    
+    // If owner, maybe see all, but here it's specifically for superadmin
+    if (req.user.role === 'owner') {
+      condition = '1=1';
+      params = [];
+    }
+
+    const rows = await db.all(`
+      SELECT a.*, u.username, t.nama_toko
+      FROM activity_log a
+      LEFT JOIN users u ON a.user_id = u.id
+      LEFT JOIN toko t ON a.toko_id = t.id
+      WHERE ${condition}
+      ORDER BY a.created_at DESC
+      LIMIT ${limit}
+    `, params);
+    
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching activity logs' });
+  }
+};
+
+exports.getStoresSummary = async (req, res) => {
+  try {
+    const db = await getDB();
+    // Filter out interval, default to 30 days
+    const intervalSql = "INTERVAL '30 days'";
+    
+    let businessCondition = 't.business_id = ?';
+    let params = [req.user.business_id];
+    
+    if (req.user.role === 'owner') {
+      businessCondition = '1=1';
+      params = [];
+    }
+
+    // Get all stores for the business
+    const stores = await db.all(`
+      SELECT t.id, t.nama_toko 
+      FROM toko t 
+      WHERE ${businessCondition}
+    `, params);
+    
+    // Get sales and transactions per store
+    const performance = await db.all(`
+      SELECT t.toko_id, 
+             COUNT(t.id) as total_transaksi, 
+             SUM(t.total_belanja) as total_pendapatan,
+             SUM((SELECT SUM(jumlah_beli) FROM transaksi_detail WHERE transaksi_id = t.id)) as total_item_terjual
+      FROM transaksi t
+      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql} AND ${businessCondition}
+      GROUP BY t.toko_id
+    `, params);
+
+    // Merge data
+    const summary = stores.map(store => {
+      const perf = performance.find(p => p.toko_id === store.id) || {};
+      return {
+        toko_id: store.id,
+        nama_toko: store.nama_toko,
+        total_transaksi: parseInt(perf.total_transaksi || 0, 10),
+        total_pendapatan: parseFloat(perf.total_pendapatan || 0),
+        total_item_terjual: parseFloat(perf.total_item_terjual || 0)
+      };
+    });
+
+    res.json(summary);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching stores summary' });
+  }
+};
