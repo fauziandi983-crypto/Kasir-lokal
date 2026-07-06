@@ -14,11 +14,10 @@ async function getDB() {
       throw new Error("DATABASE_URL tidak ditemukan.");
     }
 
+    const isSupabase = connectionString.includes('supabase.com');
     pool = new Pool({
       connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      }
+      ...(isSupabase ? { ssl: { rejectUnauthorized: false } } : {})
     });
   }
   

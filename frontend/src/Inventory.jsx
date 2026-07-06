@@ -26,6 +26,11 @@ function Inventory() {
   const [riwayatBarang, setRiwayatBarang] = useState(null);
   const [riwayatData, setRiwayatData] = useState([]);
 
+  // Manage Barcode Modal
+  const [manageBarcodeModalOpen, setManageBarcodeModalOpen] = useState(false);
+  const [manageBarcodeItem, setManageBarcodeItem] = useState(null);
+  const [newBarcodeValue, setNewBarcodeValue] = useState('');
+
   // Form for New Product
   const [newProduct, setNewProduct] = useState({
     kode_barang: '', nama_barang: '', kategori: '', satuan_utama: '', satuan_pecahan: '',
@@ -37,13 +42,10 @@ function Inventory() {
   // Form for New Batch (Restock)
   const [newBatch, setNewBatch] = useState({
     barang_id: '', barcode_batch: '', stok_batch: '', tgl_masuk: new Date().toISOString().split('T')[0], tgl_expired: '',
-    supplier_id: '', harga_beli_aktual: ''
+    supplier_id: '', harga_beli_aktual: '', harga_jual_ecer: '', harga_jual_grosir: ''
   });
 
-  const [editingPriceId, setEditingPriceId] = useState(null);
-  const [editHargaBeli, setEditHargaBeli] = useState('');
-  const [editHargaEcer, setEditHargaEcer] = useState('');
-  const [editHargaGrosir, setEditHargaGrosir] = useState('');
+  const [editMasterData, setEditMasterData] = useState(null);
 
   const fetchProducts = () => {
     axios.get(`${API_URL}/barang`).then(res => setProducts(res.data)).catch(console.error);
@@ -95,11 +97,13 @@ function Inventory() {
         tgl_masuk: newBatch.tgl_masuk,
         tgl_expired: newBatch.tgl_expired,
         supplier_id: newBatch.supplier_id || null,
-        harga_beli_aktual: parseFloat(newBatch.harga_beli_aktual) || null
+        harga_beli_aktual: parseFloat(newBatch.harga_beli_aktual) || null,
+        harga_jual_ecer: parseFloat(newBatch.harga_jual_ecer) || null,
+        harga_jual_grosir: parseFloat(newBatch.harga_jual_grosir) || null
       });
       alert('Stok Batch berhasil ditambahkan!');
       setActiveForm('list');
-      setNewBatch({ barang_id: '', barcode_batch: '', stok_batch: '', tgl_masuk: new Date().toISOString().split('T')[0], tgl_expired: '', supplier_id: '', harga_beli_aktual: '' });
+      setNewBatch({ barang_id: '', barcode_batch: '', stok_batch: '', tgl_masuk: new Date().toISOString().split('T')[0], tgl_expired: '', supplier_id: '', harga_beli_aktual: '', harga_jual_ecer: '', harga_jual_grosir: '' });
     } catch (err) {
       alert('Gagal menambah batch: ' + (err.response?.data?.message || err.message));
     }
@@ -118,39 +122,48 @@ function Inventory() {
   };
 
   const handleBarangSelectForBatch = (product) => {
-    setNewBatch({ ...newBatch, barang_id: product.id.toString(), harga_beli_aktual: product.harga_beli || '' });
+    setNewBatch({ 
+      ...newBatch, 
+      barang_id: product.id.toString(), 
+      harga_beli_aktual: product.harga_beli || '',
+      harga_jual_ecer: product.harga_jual_ecer || '',
+      harga_jual_grosir: product.harga_jual_grosir || ''
+    });
     setRestockSearch(`${product.nama_barang} (${product.satuan_pecahan})`);
     setIsRestockDropdownOpen(false);
   };
 
   const filteredRestockProducts = products.filter(p =>
     p.nama_barang.toLowerCase().includes(restockSearch.toLowerCase()) ||
-    p.kode_barang.toLowerCase().includes(restockSearch.toLowerCase())
+    p.kode_barang.toLowerCase().includes(restockSearch.toLowerCase()) ||
+    (p.barcodes && p.barcodes.toLowerCase().includes(restockSearch.toLowerCase()))
   );
 
   const selectedProduct = products.find(p => p.id === parseInt(newBatch.barang_id));
   const dateStr = newBatch.tgl_masuk ? newBatch.tgl_masuk.replace(/-/g, '') : '';
   const previewNoBatch = selectedProduct && dateStr ? `${selectedProduct.kode_barang}-${dateStr}-[AngkaAcak]` : '';
 
-  const handleEditPriceClick = (product) => {
-    setEditingPriceId(product.id);
-    setEditHargaBeli(product.harga_beli);
-    setEditHargaEcer(product.harga_jual_ecer);
-    setEditHargaGrosir(product.harga_jual_grosir);
+  const handleEditDataClick = (product) => {
+    setEditMasterData({ ...product });
   };
 
-  const handleSavePrice = async (id) => {
+  const handleSaveMaster = async (e) => {
+    e.preventDefault();
     try {
-      await axios.put(`${API_URL}/barang/${id}/harga`, {
-        harga_beli: parseFloat(editHargaBeli),
-        harga_jual_ecer: parseFloat(editHargaEcer),
-        harga_jual_grosir: parseFloat(editHargaGrosir)
+      await axios.put(`${API_URL}/barang/${editMasterData.id}/master`, {
+        ...editMasterData,
+        multiplier_konversi: parseFloat(editMasterData.multiplier_konversi),
+        harga_beli: parseFloat(editMasterData.harga_beli),
+        harga_jual_ecer: parseFloat(editMasterData.harga_jual_ecer),
+        harga_jual_grosir: parseFloat(editMasterData.harga_jual_grosir),
+        min_beli_grosir: parseFloat(editMasterData.min_beli_grosir || 0),
+        stok_minimum: parseFloat(editMasterData.stok_minimum || 0)
       });
-      alert('Harga berhasil diupdate!');
-      setEditingPriceId(null);
+      alert('Data barang berhasil diupdate!');
+      setEditMasterData(null);
       fetchProducts();
     } catch (err) {
-      alert('Gagal update harga: ' + (err.response?.data?.message || err.message));
+      alert('Gagal update data barang: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -166,12 +179,45 @@ function Inventory() {
     }
   };
 
-  const handleInventoryScan = (scannedText) => {
+  const handleOpenManageBarcode = (product) => {
+    setManageBarcodeItem(product);
+    setNewBarcodeValue('');
+    setManageBarcodeModalOpen(true);
+  };
+
+  const handleAddBarcodeSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`${API_URL}/barang/${manageBarcodeItem.id}/barcodes`, {
+        barcode: newBarcodeValue
+      });
+      alert('Barcode berhasil ditambahkan!');
+      setManageBarcodeModalOpen(false);
+      fetchProducts(); // Refresh list to get updated barcodes
+    } catch (err) {
+      alert(err.response?.data?.message || 'Gagal menambahkan barcode');
+    }
+  };
+
+  const handleInventoryScan = (scannedTextRaw) => {
+    const scannedText = scannedTextRaw.trim();
     setIsScannerOpen(false);
     if (scanTarget === 'kode_barang') {
       setNewProduct(prev => ({ ...prev, kode_barang: scannedText }));
+    } else if (scanTarget === 'edit_kode_barang') {
+      setEditMasterData(prev => ({ ...prev, kode_barang: scannedText }));
     } else if (scanTarget === 'barcode_batch') {
       setNewBatch(prev => ({ ...prev, barcode_batch: scannedText }));
+    } else if (scanTarget === 'new_barcode_value') {
+      setNewBarcodeValue(scannedText);
+    } else if (scanTarget === 'restock_search') {
+      setRestockSearch(scannedText);
+      setIsRestockDropdownOpen(true);
+      // Auto select if matched
+      const matched = products.find(p => p.kode_barang === scannedText || (p.barcodes && p.barcodes.split(',').includes(scannedText)));
+      if (matched) {
+        handleBarangSelectForBatch(matched);
+      }
     }
   };
 
@@ -244,27 +290,13 @@ function Inventory() {
                         </td>
                         <td style={{ color: 'var(--text-secondary)' }}>{p.nama_supplier || '-'}</td>
                         
-                        {editingPriceId === p.id ? (
-                          <>
-                            <td>
-                              <CurrencyInput value={editHargaBeli} onChange={val => setEditHargaBeli(val)} style={{ width: '100px', padding: '6px' }} placeholder="Modal" />
-                            </td>
-                            <td>
-                              <CurrencyInput value={editHargaEcer} onChange={val => setEditHargaEcer(val)} style={{ width: '100px', padding: '6px' }} placeholder="Ecer" />
-                              <br/><CurrencyInput value={editHargaGrosir} onChange={val => setEditHargaGrosir(val)} style={{ width: '100px', padding: '6px', marginTop: '4px' }} placeholder="Grosir" />
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td style={{ color: 'var(--text-secondary)' }}>
-                              Rp{parseFloat(p.harga_beli).toLocaleString('id-ID')}
-                            </td>
-                            <td>
-                              Rp{parseFloat(p.harga_jual_ecer).toLocaleString('id-ID')}
-                              <br/><span style={{ fontSize: '11px', color: 'var(--success)' }}>Grosir: Rp{parseFloat(p.harga_jual_grosir).toLocaleString('id-ID')}</span>
-                            </td>
-                          </>
-                        )}
+                        <td style={{ color: 'var(--text-secondary)' }}>
+                          Rp{parseFloat(p.harga_beli).toLocaleString('id-ID')}
+                        </td>
+                        <td>
+                          Rp{parseFloat(p.harga_jual_ecer).toLocaleString('id-ID')}
+                          <br/><span style={{ fontSize: '11px', color: 'var(--success)' }}>Grosir: Rp{parseFloat(p.harga_jual_grosir).toLocaleString('id-ID')}</span>
+                        </td>
 
                         <td style={{ textAlign: 'right' }}>
                           <span style={{ fontWeight: 'bold', color: isLowStock ? '#ef4444' : 'var(--accent)' }}>
@@ -274,18 +306,12 @@ function Inventory() {
                         </td>
                         
                         <td style={{ textAlign: 'center' }}>
-                          {editingPriceId === p.id ? (
-                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                              <button className="btn btn-success" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleSavePrice(p.id)}>Simpan</button>
-                              <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setEditingPriceId(null)}>Batal</button>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                              <button className="btn" style={{ padding: '4px 8px', fontSize: '12px', background: '#64748b', color: 'white', border: 'none' }} onClick={() => openRiwayat(p)}>Riwayat Harga</button>
-                              <button className="btn" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleEditPriceClick(p)}>Edit Harga</button>
-                              <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleDeleteBarang(p.id, p.nama_barang)}>Hapus</button>
-                            </div>
-                          )}
+                          <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                            <button className="btn" style={{ padding: '4px 8px', fontSize: '12px', background: '#64748b', color: 'white', border: 'none' }} onClick={() => openRiwayat(p)}>Riwayat Harga</button>
+                            <button className="btn" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleEditDataClick(p)}>Edit Data</button>
+                            <button className="btn" style={{ padding: '4px 8px', fontSize: '12px', background: '#0ea5e9', color: 'white', border: 'none' }} onClick={() => handleOpenManageBarcode(p)}>Barcodes</button>
+                            <button className="btn btn-danger" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleDeleteBarang(p.id, p.nama_barang)}>Hapus</button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -385,43 +411,46 @@ function Inventory() {
           <form onSubmit={handleAddBatch} style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '600px' }}>
             <h3 style={{ marginBottom: '16px' }}>Penerimaan Barang (Batch Baru)</h3>
 
-            <div style={{ position: 'relative' }}>
-              <input
-                type="text"
-                placeholder="🔍 Cari atau pilih barang..."
-                value={restockSearch}
-                onChange={e => { setRestockSearch(e.target.value); setIsRestockDropdownOpen(true); if (!e.target.value) setNewBatch({...newBatch, barang_id: ''}); }}
-                onFocus={() => setIsRestockDropdownOpen(true)}
-                style={{ width: '100%', color: 'black' }}
-              />
-              {isRestockDropdownOpen && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                  background: 'var(--panel-bg, white)', border: '1px solid var(--border-color, #e2e8f0)',
-                  borderRadius: '8px', boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
-                  maxHeight: '200px', overflowY: 'auto', marginTop: '4px'
-                }}>
-                  {filteredRestockProducts.length === 0 ? (
-                    <div style={{ padding: '12px', color: '#94a3b8', textAlign: 'center' }}>Tidak ada barang ditemukan</div>
-                  ) : (
-                    filteredRestockProducts.map(p => (
-                      <div key={p.id}
-                        onMouseDown={() => handleBarangSelectForBatch(p)}
-                        style={{
-                          padding: '10px 14px', cursor: 'pointer',
-                          borderBottom: '1px solid rgba(0,0,0,0.05)',
-                          background: newBatch.barang_id === p.id.toString() ? 'rgba(16, 185, 129, 0.1)' : 'transparent'
-                        }}
-                        onMouseEnter={e => e.target.style.background = 'rgba(16, 185, 129, 0.08)'}
-                        onMouseLeave={e => e.target.style.background = newBatch.barang_id === p.id.toString() ? 'rgba(16, 185, 129, 0.1)' : 'transparent'}
-                      >
-                        <div style={{ fontWeight: 600 }}>{p.nama_barang} ({p.satuan_pecahan})</div>
-                        <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.kode_barang}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
+            <div style={{ position: 'relative', display: 'flex', gap: '8px' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Cari atau scan barang..."
+                  value={restockSearch}
+                  onChange={e => { setRestockSearch(e.target.value); setIsRestockDropdownOpen(true); if (!e.target.value) setNewBatch({...newBatch, barang_id: ''}); }}
+                  onFocus={() => setIsRestockDropdownOpen(true)}
+                  style={{ width: '100%', color: 'black' }}
+                />
+                {isRestockDropdownOpen && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                    background: 'var(--panel-bg, white)', border: '1px solid var(--border-color, #e2e8f0)',
+                    borderRadius: '8px', boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
+                    maxHeight: '200px', overflowY: 'auto', marginTop: '4px'
+                  }}>
+                    {filteredRestockProducts.length === 0 ? (
+                      <div style={{ padding: '12px', color: '#94a3b8', textAlign: 'center' }}>Tidak ada barang ditemukan</div>
+                    ) : (
+                      filteredRestockProducts.map(p => (
+                        <div key={p.id}
+                          onMouseDown={() => handleBarangSelectForBatch(p)}
+                          style={{
+                            padding: '10px 14px', cursor: 'pointer',
+                            borderBottom: '1px solid rgba(0,0,0,0.05)',
+                            background: newBatch.barang_id === p.id.toString() ? 'rgba(16, 185, 129, 0.1)' : 'transparent'
+                          }}
+                          onMouseEnter={e => e.target.style.background = 'rgba(16, 185, 129, 0.08)'}
+                          onMouseLeave={e => e.target.style.background = newBatch.barang_id === p.id.toString() ? 'rgba(16, 185, 129, 0.1)' : 'transparent'}
+                        >
+                          <div style={{ fontWeight: 600 }}>{p.nama_barang} ({p.satuan_pecahan})</div>
+                          <div style={{ fontSize: '11px', color: '#94a3b8' }}>{p.kode_barang} {p.barcodes ? ` | ${p.barcodes}` : ''}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <button type="button" className="btn btn-success btn-icon" onClick={() => { setScanTarget('restock_search'); setIsScannerOpen(true); }} title="Scan Barcode">📷</button>
               <input type="hidden" required value={newBatch.barang_id} />
             </div>
 
@@ -436,6 +465,17 @@ function Inventory() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Harga Beli Aktual (Modal)</label>
                 <CurrencyInput required placeholder="Harga Beli saat ini" value={newBatch.harga_beli_aktual} onChange={val => setNewBatch({...newBatch, harga_beli_aktual: val})} />
+              </div>
+            </div>
+
+            <div className="grid-1fr-1fr" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Harga Jual Ecer (Baru)</label>
+                <CurrencyInput placeholder="Harga Eceran (Opsional)" value={newBatch.harga_jual_ecer} onChange={val => setNewBatch({...newBatch, harga_jual_ecer: val})} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Harga Jual Grosir (Baru)</label>
+                <CurrencyInput placeholder="Harga Grosir (Opsional)" value={newBatch.harga_jual_grosir} onChange={val => setNewBatch({...newBatch, harga_jual_grosir: val})} />
               </div>
             </div>
 
@@ -508,6 +548,121 @@ function Inventory() {
             <div style={{ marginTop: '24px', textAlign: 'right' }}>
               <button className="btn" onClick={() => setRiwayatModalOpen(false)}>Tutup</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Barcode Modal */}
+      {manageBarcodeModalOpen && (
+        <div className="receipt-overlay">
+          <div className="receipt-modal" style={{ width: '400px', maxWidth: '90%' }}>
+            <h2 style={{ marginBottom: '16px' }}>Kelola Barcode</h2>
+            <p style={{ marginBottom: '16px', color: 'var(--text-secondary)' }}>
+              Tambahkan barcode sekunder untuk <strong>{manageBarcodeItem?.nama_barang}</strong> jika kemasan berganti kode.
+            </p>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Barcode Terdaftar:</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <span style={{ padding: '4px 8px', background: '#e2e8f0', borderRadius: '4px', fontSize: '12px' }}>{manageBarcodeItem?.kode_barang} (Utama)</span>
+                {manageBarcodeItem?.barcodes && manageBarcodeItem.barcodes.split(',').filter(b => b !== manageBarcodeItem.kode_barang).map((b, i) => (
+                  <span key={i} style={{ padding: '4px 8px', background: '#dbeafe', color: '#1e40af', borderRadius: '4px', fontSize: '12px' }}>{b}</span>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleAddBarcodeSubmit}>
+              <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Tambah Barcode Baru</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input required placeholder="Scan atau ketik..." value={newBarcodeValue} onChange={e => setNewBarcodeValue(e.target.value)} style={{ flex: 1 }} />
+                <button type="button" className="btn btn-success btn-icon" onClick={() => { setScanTarget('new_barcode_value'); setIsScannerOpen(true); }} title="Scan Barcode">📷</button>
+              </div>
+
+              <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-danger" onClick={() => setManageBarcodeModalOpen(false)}>Tutup</button>
+                <button type="submit" className="btn btn-success">Simpan Barcode</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Master Modal */}
+      {editMasterData && (
+        <div className="receipt-overlay">
+          <div className="receipt-modal" style={{ width: '600px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ marginBottom: '16px' }}>Edit Data Barang</h2>
+            
+            <form className="grid-1fr-1fr" onSubmit={handleSaveMaster} style={{ display: 'grid', gap: '16px', textAlign: 'left' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Kode Barang</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input required value={editMasterData.kode_barang} onChange={e => setEditMasterData({...editMasterData, kode_barang: e.target.value})} style={{ flex: 1 }} />
+                  <button type="button" className="btn btn-success btn-icon" onClick={() => { setScanTarget('edit_kode_barang'); setIsScannerOpen(true); }} title="Scan Barcode">📷</button>
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Nama Barang</label>
+                <input required value={editMasterData.nama_barang} onChange={e => setEditMasterData({...editMasterData, nama_barang: e.target.value})} />
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Kategori</label>
+                <input value={editMasterData.kategori} onChange={e => setEditMasterData({...editMasterData, kategori: e.target.value})} />
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Konversi (1 Utama = ? Pecahan)</label>
+                <input required type="number" step="0.01" value={editMasterData.multiplier_konversi} onChange={e => setEditMasterData({...editMasterData, multiplier_konversi: e.target.value})} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Satuan Utama</label>
+                <select required value={editMasterData.satuan_utama} onChange={e => setEditMasterData({...editMasterData, satuan_utama: e.target.value})}>
+                  <option value="" disabled>-- Pilih --</option>
+                  {SATUAN_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Satuan Pecahan (Terkecil)</label>
+                <select required value={editMasterData.satuan_pecahan} onChange={e => setEditMasterData({...editMasterData, satuan_pecahan: e.target.value})}>
+                  <option value="" disabled>-- Pilih --</option>
+                  {SATUAN_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Harga Modal / Beli</label>
+                <CurrencyInput required value={editMasterData.harga_beli} onChange={val => setEditMasterData({...editMasterData, harga_beli: val})} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Harga Jual Eceran</label>
+                <CurrencyInput required value={editMasterData.harga_jual_ecer} onChange={val => setEditMasterData({...editMasterData, harga_jual_ecer: val})} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Harga Jual Grosir</label>
+                <CurrencyInput required value={editMasterData.harga_jual_grosir} onChange={val => setEditMasterData({...editMasterData, harga_jual_grosir: val})} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Min. Beli utk Grosir</label>
+                <input required type="number" step="0.01" value={editMasterData.min_beli_grosir} onChange={e => setEditMasterData({...editMasterData, min_beli_grosir: e.target.value})} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: '1 / -1' }}>
+                <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>Stok Minimum (Alert)</label>
+                <input type="number" step="0.01" value={editMasterData.stok_minimum} onChange={e => setEditMasterData({...editMasterData, stok_minimum: e.target.value})} />
+              </div>
+
+              <div style={{ gridColumn: '1 / -1', marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="btn btn-danger" onClick={() => setEditMasterData(null)}>Batal</button>
+                <button type="submit" className="btn btn-success">💾 Simpan Perubahan</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

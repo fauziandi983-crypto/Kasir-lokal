@@ -4,7 +4,14 @@ function CurrencyInput({ value, onChange, placeholder, required, style, disabled
   // Format the number to Indonesian Rupiah format
   const formatCurrency = (val) => {
     if (val === null || val === undefined || val === '') return '';
-    const numericValue = val.toString().replace(/[^0-9]/g, '');
+    let cleanVal = val;
+    if (typeof val === 'string' || typeof val === 'number') {
+      const floatVal = parseFloat(val);
+      if (!isNaN(floatVal)) {
+        cleanVal = Math.round(floatVal).toString();
+      }
+    }
+    const numericValue = cleanVal.toString().replace(/[^0-9]/g, '');
     if (!numericValue) return '';
     return 'Rp' + parseInt(numericValue, 10).toLocaleString('id-ID');
   };

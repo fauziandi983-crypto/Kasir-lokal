@@ -27,6 +27,11 @@ async function runMigration() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    
+    // Safety check: Add columns if table already existed before they were added
+    await db.exec(`ALTER TABLE toko ADD COLUMN IF NOT EXISTS logo TEXT`);
+    await db.exec(`ALTER TABLE toko ADD COLUMN IF NOT EXISTS alamat TEXT`);
+    await db.exec(`ALTER TABLE toko ADD COLUMN IF NOT EXISTS no_hp VARCHAR(50)`);
 
     // 3. Add columns to users
     await db.exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS business_id INTEGER REFERENCES business(id) ON DELETE CASCADE`);

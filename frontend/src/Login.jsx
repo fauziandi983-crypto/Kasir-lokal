@@ -1,16 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 const API_URL = '/api';
+const GOOGLE_CLIENT_ID = '268274669708-t7j0au9mqhimhblksdlbae65c918eeh9.apps.googleusercontent.com';
 
 function Login({ onLoginSuccess }) {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isResetPassword, setIsResetPassword] = useState(false);
+  
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [namaKlien, setNamaKlien] = useState('');
+  const [email, setEmail] = useState('');
+  
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    // Cek apakah ada token reset di URL (misal: /?reset=abcde123)
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('reset');
+    if (token) {
+      setResetToken(token);
+      setIsResetPassword(true);
+    }
+  }, []);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -20,10 +40,11 @@ function Login({ onLoginSuccess }) {
     
     try {
       if (isRegistering) {
-        await axios.post(`${API_URL}/auth/register-public`, { username, password, nama_klien: namaKlien });
+        await axios.post(`${API_URL}/auth/register-public`, { username, password, nama_klien: namaKlien, email });
         setSuccess('Pendaftaran berhasil! Silakan login.');
         setIsRegistering(false);
         setPassword('');
+        setEmail('');
       } else {
         const res = await axios.post(`${API_URL}/auth/login`, { username, password });
         localStorage.setItem('token', res.data.token);
@@ -38,210 +59,230 @@ function Login({ onLoginSuccess }) {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await axios.post(`${API_URL}/auth/google`, { 
+        token: credentialResponse.credential,
+        nama_klien: 'Klien Baru (Google)'
+      });
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      onLoginSuccess(res.data.user);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal login dengan Google');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const res = await axios.post(`${API_URL}/auth/forgot-password`, { email });
+      setSuccess(res.data.message || 'Link reset password telah dikirim');
+      setEmail('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal mengirim email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const res = await axios.post(`${API_URL}/auth/reset-password`, { token: resetToken, newPassword });
+      setSuccess(res.data.message || 'Password berhasil direset');
+      
+      // Bersihkan URL dari token
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      setTimeout(() => {
+        setIsResetPassword(false);
+        setResetToken('');
+        setNewPassword('');
+      }, 2000);
+      
+    } catch (err) {
+      setError(err.response?.data?.message || 'Gagal reset password');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  let title = 'Sistem KasirUKM';
+  let subtitle = 'Silakan masuk untuk melanjutkan';
+  if (isRegistering) {
+    title = 'Daftar Klien KasirUKM';
+    subtitle = 'Lengkapi data usaha Anda untuk mendaftar';
+  } else if (isResetPassword) {
+    title = 'Reset Password';
+    subtitle = 'Masukkan password baru Anda';
+  } else if (isForgotPassword) {
+    title = 'Lupa Password';
+    subtitle = 'Masukkan email untuk menerima link reset';
+  }
+
+  // Light Theme styling matching App.jsx
+  const inputStyle = {
+    width: '100%', 
+    padding: '10px 14px', 
+    background: '#ffffff', 
+    border: '1px solid #cbd5e1', 
+    borderRadius: '8px', 
+    color: '#1e293b', 
+    fontSize: '14px', 
+    outline: 'none',
+    transition: 'border-color 0.2s'
+  };
+
+  const labelStyle = { 
+    display: 'block', 
+    color: '#475569', 
+    fontSize: '12px', 
+    marginBottom: '6px', 
+    fontWeight: 600 
+  };
+
   return (
     <div style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+      backgroundColor: '#f1f5f9', // Light gray from App.jsx
       fontFamily: "'Inter', 'Segoe UI', sans-serif"
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '420px',
-        padding: '40px',
-        background: 'rgba(30, 41, 59, 0.8)',
-        backdropFilter: 'blur(20px)',
-        borderRadius: '20px',
-        border: '1px solid rgba(148, 163, 184, 0.1)',
-        boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
+        maxWidth: '380px',
+        padding: '24px 32px',
+        background: '#ffffff',
+        borderRadius: '16px',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.05)',
         margin: '16px'
       }}>
         {/* Logo / Header */}
-        <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{
-            width: '70px', height: '70px',
-            margin: '0 auto 16px',
-            borderRadius: '16px',
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '32px',
-            boxShadow: '0 8px 25px rgba(16, 185, 129, 0.3)'
-          }}>
-            🏪
-          </div>
-          <h1 style={{
-            fontSize: '24px',
-            fontWeight: 700,
-            color: '#f1f5f9',
-            margin: '0 0 6px'
-          }}>
-            {isRegistering ? 'Daftar Klien KasirUKM' : 'Sistem KasirUKM'}
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <img src="/logo.png" alt="KasirUKM Logo" style={{ height: '50px', objectFit: 'contain', marginBottom: '10px' }} />
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#1e40af', margin: '0 0 4px' }}>
+            {title}
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
-            {isRegistering ? 'Lengkapi data usaha Anda untuk mendaftar' : 'Silakan masuk untuk melanjutkan'}
-          </p>
+          <p style={{ color: '#64748b', fontSize: '13px', margin: 0 }}>{subtitle}</p>
         </div>
 
         {/* Error / Success Message */}
         {error && (
-          <div style={{
-            padding: '12px 16px',
-            background: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-            borderRadius: '10px',
-            color: '#fca5a5',
-            fontSize: '13px',
-            marginBottom: '20px',
-            textAlign: 'center'
-          }}>
+          <div style={{ padding: '10px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#ef4444', fontSize: '12px', marginBottom: '16px', textAlign: 'center' }}>
             ❌ {error}
           </div>
         )}
         {success && (
-          <div style={{
-            padding: '12px 16px',
-            background: 'rgba(16, 185, 129, 0.15)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            borderRadius: '10px',
-            color: '#10b981',
-            fontSize: '13px',
-            marginBottom: '20px',
-            textAlign: 'center'
-          }}>
+          <div style={{ padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', color: '#10b981', fontSize: '12px', marginBottom: '16px', textAlign: 'center' }}>
             ✅ {success}
           </div>
         )}
 
-        {/* Auth Form */}
-        <form onSubmit={handleAuth}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
-              Username
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="Masukkan username"
-              required
-              autoFocus
-              style={{
-                width: '100%',
-                padding: '14px 16px',
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(148, 163, 184, 0.2)',
-                borderRadius: '10px',
-                color: '#f1f5f9',
-                fontSize: '15px',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={e => e.target.style.borderColor = '#10b981'}
-              onBlur={e => e.target.style.borderColor = 'rgba(148, 163, 184, 0.2)'}
-            />
-          </div>
+        {/* FORMS */}
+        {isResetPassword ? (
+          <form onSubmit={handleResetPassword}>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={labelStyle}>Password Baru</label>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Masukkan password baru" required autoFocus style={inputStyle} onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
+            </div>
+            <button type="submit" disabled={isLoading} style={{ width: '100%', padding: '12px', background: isLoading ? '#94a3b8' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer' }}>
+              {isLoading ? '⏳ Memproses...' : 'Simpan Password Baru'}
+            </button>
+          </form>
+        ) : isForgotPassword ? (
+          <form onSubmit={handleForgotPassword}>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={labelStyle}>Email Terdaftar</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@anda.com" required autoFocus style={inputStyle} onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
+            </div>
+            <button type="submit" disabled={isLoading} style={{ width: '100%', padding: '12px', background: isLoading ? '#94a3b8' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', marginBottom: '16px' }}>
+              {isLoading ? '⏳ Mengirim...' : 'Kirim Link Reset'}
+            </button>
+            <div style={{ textAlign: 'center' }}>
+              <button type="button" onClick={() => { setIsForgotPassword(false); setError(''); setSuccess(''); setEmail(''); }} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+                Kembali ke Login
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleAuth}>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={labelStyle}>Username</label>
+              <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="Masukkan username" required autoFocus style={inputStyle} onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
+            </div>
 
-          <div style={{ marginBottom: isRegistering ? '20px' : '28px' }}>
-            <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Masukkan password"
-              required
-              style={{
-                width: '100%',
-                padding: '14px 16px',
-                background: 'rgba(15, 23, 42, 0.6)',
-                border: '1px solid rgba(148, 163, 184, 0.2)',
-                borderRadius: '10px',
-                color: '#f1f5f9',
-                fontSize: '15px',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-                boxSizing: 'border-box'
-              }}
-              onFocus={e => e.target.style.borderColor = '#10b981'}
-              onBlur={e => e.target.style.borderColor = 'rgba(148, 163, 184, 0.2)'}
-            />
-          </div>
+            <div style={{ marginBottom: isRegistering ? '16px' : '8px' }}>
+              <label style={labelStyle}>Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Masukkan password" required style={inputStyle} onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
+            </div>
 
-          {isRegistering && (
-            <div style={{ marginBottom: '28px' }}>
-              <label style={{ display: 'block', color: '#94a3b8', fontSize: '13px', marginBottom: '8px', fontWeight: 500 }}>
-                Nama Usaha / Perusahaan
-              </label>
-              <input
-                type="text"
-                value={namaKlien}
-                onChange={e => setNamaKlien(e.target.value)}
-                placeholder="Masukkan nama usaha Anda"
-                required
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  background: 'rgba(15, 23, 42, 0.6)',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
-                  borderRadius: '10px',
-                  color: '#f1f5f9',
-                  fontSize: '15px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                  boxSizing: 'border-box'
-                }}
-                onFocus={e => e.target.style.borderColor = '#10b981'}
-                onBlur={e => e.target.style.borderColor = 'rgba(148, 163, 184, 0.2)'}
+            {!isRegistering && (
+              <div style={{ textAlign: 'right', marginBottom: '16px' }}>
+                <button type="button" onClick={() => setIsForgotPassword(true)} style={{ background: 'none', border: 'none', color: '#1e40af', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>
+                  Lupa Password?
+                </button>
+              </div>
+            )}
+
+            {isRegistering && (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={labelStyle}>Email (Untuk pemulihan akun)</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@anda.com" required style={inputStyle} onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={labelStyle}>Nama Usaha / Perusahaan</label>
+                  <input type="text" value={namaKlien} onChange={e => setNamaKlien(e.target.value)} placeholder="Masukkan nama usaha Anda" required style={inputStyle} onFocus={e => e.target.style.borderColor = '#10b981'} onBlur={e => e.target.style.borderColor = '#cbd5e1'} />
+                </div>
+              </>
+            )}
+
+            <button type="submit" disabled={isLoading} style={{ width: '100%', padding: '12px', background: isLoading ? '#94a3b8' : '#10b981', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: isLoading ? 'not-allowed' : 'pointer', marginBottom: '16px' }}>
+              {isLoading ? '⏳ Memproses...' : (isRegistering ? '📝 Daftar' : '🔐 Masuk')}
+            </button>
+            
+            <div style={{ position: 'relative', textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px solid #e2e8f0' }}></div>
+              <span style={{ position: 'relative', background: '#ffffff', padding: '0 10px', color: '#94a3b8', fontSize: '11px', fontWeight: 600 }}>ATAU</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google Login Failed')}
+                useOneTap
+                theme="outline"
+                size="medium"
+                shape="rectangular"
               />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              background: isLoading ? '#64748b' : 'linear-gradient(135deg, #10b981, #059669)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: '16px',
-              fontWeight: 600,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: isLoading ? 'none' : '0 4px 15px rgba(16, 185, 129, 0.3)'
-            }}
-          >
-            {isLoading ? '⏳ Memproses...' : (isRegistering ? '📝 Daftar' : '🔐 Masuk')}
-          </button>
-        </form>
+            <div style={{ textAlign: 'center' }}>
+              <button type="button" onClick={() => { setIsRegistering(!isRegistering); setError(''); setSuccess(''); }} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+                {isRegistering ? 'Sudah punya akun? Masuk di sini' : 'Belum punya akun? Daftar di sini'}
+              </button>
+            </div>
+          </form>
+        )}
 
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button 
-            onClick={() => {
-              setIsRegistering(!isRegistering);
-              setError('');
-              setSuccess('');
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#38bdf8',
-              fontSize: '13px',
-              cursor: 'pointer',
-              textDecoration: 'underline'
-            }}
-          >
-            {isRegistering ? 'Sudah punya akun? Masuk di sini' : 'Belum punya akun? Daftar di sini'}
-          </button>
-        </div>
-
-        <p style={{ textAlign: 'center', color: '#475569', fontSize: '12px', marginTop: '24px' }}>
+        <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px', marginTop: '24px' }}>
           © 2026 KasirUKM. All rights reserved.
         </p>
       </div>
@@ -249,4 +290,10 @@ function Login({ onLoginSuccess }) {
   );
 }
 
-export default Login;
+export default function LoginWrapper(props) {
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <Login {...props} />
+    </GoogleOAuthProvider>
+  );
+}

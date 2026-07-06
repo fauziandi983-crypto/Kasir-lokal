@@ -1,13 +1,18 @@
 const { getDB } = require('../db');
 
+// VULN-04 FIX: Daftar putih filter yang diizinkan — cegah SQL injection via parameter interval
+const ALLOWED_FILTERS = new Set(['mingguan', 'bulanan', '3bulan', '6bulan', '1tahun']);
+
 const getFilterInterval = (filter) => {
+  // Validasi: hanya izinkan nilai yang ada di whitelist
+  if (!ALLOWED_FILTERS.has(filter)) filter = 'bulanan';
   switch(filter) {
     case 'mingguan': return "INTERVAL '7 days'";
     case 'bulanan': return "INTERVAL '30 days'";
     case '3bulan': return "INTERVAL '90 days'";
     case '6bulan': return "INTERVAL '180 days'";
     case '1tahun': return "INTERVAL '365 days'";
-    default: return "INTERVAL '30 days'"; // default bulanan
+    default: return "INTERVAL '30 days'";
   }
 };
 
@@ -56,6 +61,22 @@ exports.getSummary = async (req, res) => {
     `, [...params]);
     const keuntungan_bulan_ini = parseFloat(profitRow?.keuntungan || 0);
 
+    // 3.5 Keuntungan Mengendap (Piutang)
+    // Profit of a transaction * (sisa_tagihan / total_belanja)
+    const profitMengendapRow = await db.get(`
+      SELECT SUM(
+        ((td.harga_satuan_terpakai - COALESCE(bb.harga_beli_aktual, b.harga_beli)) * td.jumlah_beli) * 
+        (t.sisa_tagihan / NULLIF(t.total_belanja, 0))
+      ) as keuntungan_mengendap
+      FROM transaksi_detail td
+      JOIN transaksi t ON td.transaksi_id = t.id
+      LEFT JOIN barang_batch bb ON td.batch_id = bb.id
+      LEFT JOIN barang b ON td.barang_id = b.id
+      WHERE DATE(t.waktu_transaksi) >= CURRENT_DATE - ${intervalSql} AND t.status_pembayaran = 'HUTANG' AND t.${filterCondition}
+    `, [...params]);
+    const keuntungan_mengendap = parseFloat(profitMengendapRow?.keuntungan_mengendap || 0);
+    const keuntungan_di_tangan = keuntungan_bulan_ini - keuntungan_mengendap;
+
     // 4. Saldo Toko (Nilai Aset Stok Saat Ini)
     const saldoRow = await db.get(`
       SELECT SUM(bb.stok_batch * COALESCE(bb.harga_beli_aktual, b.harga_beli)) as total 
@@ -65,13 +86,52 @@ exports.getSummary = async (req, res) => {
     `, [...params]);
     const saldo_toko = parseFloat(saldoRow?.total || 0);
 
+    // 5. Total Piutang (Hutang Pelanggan Belum Lunas)
+    const piutangRow = await db.get(`
+      SELECT SUM(sisa_tagihan) as total_piutang
+      FROM transaksi
+      WHERE status_pembayaran = 'HUTANG' AND sisa_tagihan > 0 AND ${filterCondition}
+    `, [...params]);
+    const total_piutang = parseFloat(piutangRow?.total_piutang || 0);
+
+    // 5.5 Potensi Piutang Macet (Lewat Jatuh Tempo)
+    const piutangMacetRow = await db.get(`
+      SELECT SUM(sisa_tagihan) as total_macet
+      FROM transaksi
+      WHERE status_pembayaran = 'HUTANG' AND sisa_tagihan > 0 AND tgl_jatuh_tempo < CURRENT_DATE AND ${filterCondition}
+    `, [...params]);
+    const total_piutang_jatuh_tempo = parseFloat(piutangMacetRow?.total_macet || 0);
+
+    // 6. Kas Masuk Periode Ini (Uang Riil)
+    // = (Total Belanja - Sisa Tagihan) + Cicilan Hutang
+    const kasMasukTrx = await db.get(`
+      SELECT SUM(total_belanja - sisa_tagihan) as total
+      FROM transaksi
+      WHERE DATE(waktu_transaksi) >= CURRENT_DATE - ${intervalSql} AND ${filterCondition}
+    `, [...params]);
+    
+    // For pembayaran_hutang, we need to join transaksi to get toko_id if not present, but we have toko_id in pembayaran_hutang.
+    let phFilter = filterCondition.replace(/b\./g, '').replace(/t\./g, ''); 
+    const kasMasukCicilan = await db.get(`
+      SELECT SUM(jumlah_bayar) as total
+      FROM pembayaran_hutang
+      WHERE DATE(tgl_bayar) >= CURRENT_DATE - ${intervalSql} AND ${phFilter}
+    `, [...params]);
+
+    const kas_masuk_bulan_ini = parseFloat(kasMasukTrx?.total || 0) + parseFloat(kasMasukCicilan?.total || 0);
+
     res.json({
       pendapatan_hari_ini,
-      pendapatan_bulan_ini, // reusing field name for frontend compatibility
-      transaksi_bulan_ini,  // reusing field name
-      keuntungan_bulan_ini, // reusing field name
+      pendapatan_bulan_ini, 
+      transaksi_bulan_ini,  
+      keuntungan_bulan_ini, 
+      keuntungan_mengendap,
+      keuntungan_di_tangan,
       saldo_toko,
-      kerugian_bulan_ini: 0 // Optional: implement logic if needed
+      kerugian_bulan_ini: 0,
+      total_piutang,
+      total_piutang_jatuh_tempo,
+      kas_masuk_bulan_ini
     });
   } catch (error) {
     console.error(error);

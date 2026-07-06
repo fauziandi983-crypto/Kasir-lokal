@@ -10,6 +10,7 @@ async function seed() {
     const res1 = await db.run(`
       INSERT INTO barang (kode_barang, nama_barang, satuan_utama, satuan_pecahan, multiplier_konversi, harga_beli, harga_jual_ecer, harga_jual_grosir, min_beli_grosir, stok_awal_referensi)
       VALUES ('BRG-001', 'Kopi Kapal Api', 'Dus', 'Sachet', 120, 1000, 1500, 1300, 20, 1000)
+      RETURNING id
     `);
     const id1 = res1.lastID;
     
@@ -23,6 +24,7 @@ async function seed() {
     const res2 = await db.run(`
       INSERT INTO barang (kode_barang, nama_barang, satuan_utama, satuan_pecahan, multiplier_konversi, harga_beli, harga_jual_ecer, harga_jual_grosir, min_beli_grosir, stok_awal_referensi)
       VALUES ('BRG-002', 'Beras Maknyus', 'Karung', 'Kg', 25, 10000, 13000, 11500, 10, 500)
+      RETURNING id
     `);
     const id2 = res2.lastID;
     
